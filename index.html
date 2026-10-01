@@ -6,7 +6,7 @@
 <title>記帳系統</title>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, getDocs, deleteDoc, updateDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyBvexkOGktmNSwKVFXFjOudbCFEsne3oug",
@@ -32,6 +32,11 @@
   window._fbAddRecord = async (record) => {
     const docRef = await addDoc(collection(db, "records"), record);
     return docRef.id;
+  };
+
+  // 全域更新
+  window._fbUpdateRecord = async (docId, data) => {
+    await updateDoc(doc(db, "records", docId), data);
   };
 
   // 全域刪除
@@ -204,6 +209,11 @@
   .field select option { background: var(--surface); color: var(--text); }
 
   .btn-row { display: flex; gap: 10px; margin-top: 20px; }
+  .form-card.editing { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .edit-hint { font-family: var(--sans); font-size: 12px; color: var(--accent); font-weight: 400; }
+  .cancel-btn { display: none; }
+  .form-card.editing .cancel-btn { display: block; }
+  .form-card.editing .export-btn:not(.cancel-btn) { display: none; }
   .submit-btn {
     flex: 1; padding: 11px 16px;
     background: var(--accent);
@@ -247,7 +257,9 @@
     animation: fadeIn .2s ease;
     transition: background .15s;
   }
+  .record-item { cursor: pointer; }
   .record-item:hover { background: var(--surface2); }
+  .record-item.editing { background: var(--accent-soft); }
   .record-item:last-child { border-bottom: none; }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -260,7 +272,7 @@
 
   .record-info { flex: 1; min-width: 0; }
   .record-desc { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .record-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .record-meta { font-size: 12px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .record-bank {
     display: inline-block; font-size: 11px; padding: 0 6px;
     background: var(--accent-soft); color: var(--accent);
@@ -275,15 +287,16 @@
   .record-amount.expense { color: var(--text); }
   .record-amount.income  { color: var(--green); }
 
-  .delete-btn {
+  .delete-btn, .edit-btn {
     width: 26px; height: 26px; border-radius: 6px; border: none;
     background: transparent; color: var(--muted); cursor: pointer;
     font-size: 13px; display: flex; align-items: center; justify-content: center;
     transition: all .15s; flex-shrink: 0; opacity: 0;
   }
-  .record-item:hover .delete-btn, .delete-btn:focus-visible { opacity: 1; }
+  .record-item:hover .delete-btn, .delete-btn:focus-visible, .record-item:hover .edit-btn, .edit-btn:focus-visible { opacity: 1; }
+  .edit-btn:hover { background: var(--accent-soft); color: var(--accent); }
   .delete-btn:hover { background: var(--red-soft); color: var(--red); }
-  @media (hover: none) { .delete-btn { opacity: 1; } }
+  @media (hover: none) { .delete-btn, .edit-btn { opacity: 1; } }
 
   .empty-state {
     text-align: center; padding: 48px 0; color: var(--muted);
@@ -360,8 +373,8 @@
   <div class="main">
 
     <!-- 新增表單 -->
-    <div class="form-card">
-      <div class="card-title">新增一筆</div>
+    <div class="form-card" id="formCard">
+      <div class="card-title" id="formTitle">新增一筆</div>
 
       <div class="type-toggle">
         <button class="type-btn active expense" id="btnExpense" onclick="setType('支出')">支出</button>
@@ -408,7 +421,8 @@
       </div>
 
       <div class="btn-row">
-        <button class="submit-btn" onclick="addRecord()">新增記帳</button>
+        <button class="submit-btn" id="submitBtn" onclick="addRecord()">新增記帳</button>
+        <button class="export-btn cancel-btn" onclick="cancelEdit()">取消</button>
         <button class="export-btn" onclick="exportReport()">匯出報表</button>
       </div>
     </div>
@@ -446,6 +460,7 @@ const ICONS = {
 let currentType   = '支出';
 let currentFilter = 'all';
 let _records      = [];   // 本地快取
+let editingId     = null; // 編輯中的記錄 docId
 
 // ── 初始化 ────────────────────────────────────────────────────
 window._initApp = async () => {
@@ -485,7 +500,7 @@ function updateCats() {
   sel.innerHTML = CATS[currentType].map(c => `<option>${c}</option>`).join('');
 }
 
-// ── 新增 ──────────────────────────────────────────────────────
+// ── 新增 / 儲存修改 ───────────────────────────────────────────
 async function addRecord() {
   const date   = document.getElementById('fDate').value;
   const amount = parseFloat(document.getElementById('fAmount').value);
@@ -499,12 +514,30 @@ async function addRecord() {
     toast('請填寫日期與金額', 'var(--yellow)'); return;
   }
 
-  const record = {
+  const fields = {
     date, type: currentType,
     category: cat, bank, payment: pay,
     desc: desc || cat, note, amount,
-    createdAt: Date.now(),
   };
+
+  if (editingId) {
+    toast('儲存中…', 'var(--muted)');
+    try {
+      await window._fbUpdateRecord(editingId, fields);
+    } catch (e) {
+      toast('儲存失敗，請再試一次', 'var(--red)'); return;
+    }
+    const r = _records.find(r => r._docId === editingId);
+    Object.assign(r, fields);
+    _records.sort((a,b) => a.date.localeCompare(b.date));
+    cancelEdit();
+    updateStats();
+    renderList();
+    toast(`已更新：${fields.desc}　NT$ ${amount.toLocaleString()}`);
+    return;
+  }
+
+  const record = { ...fields, createdAt: Date.now() };
 
   toast('儲存中…', 'var(--muted)');
   const docId = await window._fbAddRecord(record);
@@ -520,8 +553,48 @@ async function addRecord() {
   toast(`已記錄：${record.desc}　NT$ ${amount.toLocaleString()}`);
 }
 
+// ── 編輯 ──────────────────────────────────────────────────────
+function startEdit(docId) {
+  const r = _records.find(r => r._docId === docId);
+  if (!r) return;
+  editingId = docId;
+  setType(r.type);
+  const sel = document.getElementById('fCategory');
+  if (!CATS[r.type].includes(r.category)) sel.insertAdjacentHTML('beforeend', `<option>${r.category}</option>`);
+  sel.value = r.category;
+  document.getElementById('fDate').value    = r.date;
+  document.getElementById('fAmount').value  = r.amount;
+  document.getElementById('fBank').value    = r.bank || '';
+  document.getElementById('fPayment').value = r.payment;
+  document.getElementById('fDesc').value    = r.desc || '';
+  document.getElementById('fNote').value    = r.note || '';
+
+  document.getElementById('formCard').classList.add('editing');
+  document.getElementById('formTitle').innerHTML = '編輯記錄 <span class="edit-hint">修改後按「儲存修改」</span>';
+  document.getElementById('submitBtn').textContent = '儲存修改';
+  renderList();
+  document.getElementById('formCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('fAmount').focus({ preventScroll: true });
+}
+
+function cancelEdit() {
+  editingId = null;
+  document.getElementById('formCard').classList.remove('editing');
+  document.getElementById('formTitle').textContent = '新增一筆';
+  document.getElementById('submitBtn').textContent = '新增記帳';
+  document.getElementById('fDate').value   = new Date().toISOString().slice(0,10);
+  document.getElementById('fAmount').value  = '';
+  document.getElementById('fBank').value    = '';
+  document.getElementById('fPayment').value = '現金';
+  document.getElementById('fDesc').value    = '';
+  document.getElementById('fNote').value    = '';
+  setType(currentType);
+  renderList();
+}
+
 // ── 刪除 ──────────────────────────────────────────────────────
 async function deleteRecord(docId) {
+  if (docId === editingId) cancelEdit();
   await window._fbDeleteRecord(docId);
   _records = _records.filter(r => r._docId !== docId);
   updateStats();
@@ -570,7 +643,7 @@ function renderList() {
   }
 
   el.innerHTML = records.map(r => `
-    <div class="record-item">
+    <div class="record-item${r._docId===editingId?' editing':''}" onclick="startEdit('${r._docId}')" title="點一下編輯">
       <div class="record-icon ${r.type==='支出'?'expense':'income'}">
         ${ICONS[r.category] || (r.type==='支出'?'💸':'💰')}
       </div>
@@ -586,7 +659,8 @@ function renderList() {
       <div class="record-amount ${r.type==='支出'?'expense':'income'}">
         ${r.type==='支出'?'-':'+'}${r.amount.toLocaleString()}
       </div>
-      <button class="delete-btn" onclick="deleteRecord('${r._docId}')" title="刪除">✕</button>
+      <button class="edit-btn" onclick="event.stopPropagation(); startEdit('${r._docId}')" title="編輯">✎</button>
+      <button class="delete-btn" onclick="event.stopPropagation(); deleteRecord('${r._docId}')" title="刪除">✕</button>
     </div>
   `).join('');
 }
