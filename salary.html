@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>薪資計算工具</title>
+<style>
+  :root { --bg:#f4f6f9; --card:#fff; --text:#1f2937; --muted:#6b7280; --accent:#1d4ed8; --line:#e5e7eb; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111827; --card:#1f2937; --text:#f3f4f6; --muted:#9ca3af; --accent:#60a5fa; --line:#374151; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--text); font-family:system-ui,"Noto Sans TC",sans-serif; }
+  .card { max-width:480px; margin:0 auto; background:var(--card); border-radius:12px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,.08); }
+  h1 { font-size:1.25rem; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:.85rem; margin-bottom:16px; }
+  label { display:block; font-size:.9rem; margin:14px 0 6px; font-weight:600; }
+  select, input { width:100%; padding:10px; font-size:1rem; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--text); }
+  table { width:100%; border-collapse:collapse; margin-top:20px; font-size:.95rem; }
+  td { padding:8px 0; border-bottom:1px solid var(--line); }
+  td:last-child { text-align:right; font-variant-numeric:tabular-nums; }
+  tr.total td { border-bottom:none; font-weight:700; font-size:1.2rem; color:var(--accent); padding-top:14px; }
+  .note { color:var(--muted); font-size:.78rem; margin-top:14px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>薪資計算工具</h1>
+  <div class="sub">交通部臺灣鐵路管理局職員薪額及專業加給表（114年1月1日生效）</div>
+
+  <label for="point">薪點</label>
+  <select id="point"></select>
+
+  <label for="level">增支層次</label>
+  <select id="level"></select>
+
+  <label for="boss">主管加給（元）</label>
+  <input id="boss" type="number" min="0" step="1" value="0" inputmode="numeric">
+
+  <table>
+    <tr><td>薪額</td><td id="r-salary">0</td></tr>
+    <tr><td>基本數額</td><td id="r-base">0</td></tr>
+    <tr><td>增支數額</td><td id="r-extra">0</td></tr>
+    <tr><td>主管加給</td><td id="r-boss">0</td></tr>
+    <tr><td>留才津貼</td><td id="r-keep">2,000</td></tr>
+    <tr class="total"><td>薪資合計</td><td id="r-total">0</td></tr>
+  </table>
+  <div class="note">薪資 = 薪額 + 基本數額 + 增支數額 + 主管加給 + 留才津貼（固定 2,000）。</div>
+</div>
+
+<script>
+// [薪級, 薪點, 薪額]
+const SALARY = [
+[1,800,64420],[2,790,62740],[3,780,61060],[4,750,58940],[5,730,57600],[6,710,56240],[7,690,54890],
+[8,670,53530],[9,650,52200],[10,630,50860],[11,610,49500],[12,590,47650],[13,550,45910],[14,535,44910],
+[15,520,43770],[16,505,42590],[17,490,41490],[18,475,40250],[19,460,39070],[20,445,37910],[21,430,36730],
+[22,415,35500],[23,400,34450],[24,385,33500],[25,370,32520],[26,360,31700],[27,350,30890],[28,340,30090],
+[29,330,29300],[30,320,28480],[31,310,27690],[32,300,26950],[33,290,26110],[34,280,25370],[35,270,24600],
+[36,260,24010],[37,250,23180],[38,240,22620],[39,230,22120],[40,220,21580],[41,210,21010],[42,200,20440],
+[43,190,19930],[44,180,19360],[45,170,18800],[46,160,18250]
+];
+// 基本數額：[起始薪級, 結束薪級, 金額]
+const BASE = [
+[1,1,39080],[2,3,33270],[4,5,31500],[6,7,31390],[8,11,28790],[12,16,27560],[17,17,24160],
+[18,18,21620],[19,20,21590],[21,21,21510],[22,25,18700],[26,26,18670],[27,30,17650],[31,31,16390],
+[32,33,15660],[34,38,15520],[39,39,15410],[40,46,15350]
+];
+// 增支層次 -> 增支數額
+const EXTRA = {1:8700,2:8120,3:7550,4:6970,5:6390,6:5820,7:5600,8:5250,9:5020,10:4780,11:4440,12:4220};
+const KEEP = 2000;
+
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("en-US");
+
+$("point").innerHTML = SALARY.map(([g,p,s]) => `<option value="${g}">${p} 點（薪級 ${g}）</option>`).join("");
+$("level").innerHTML = '<option value="0">不適用（0）</option>' +
+  Object.entries(EXTRA).map(([l,a]) => `<option value="${l}">第 ${l} 層次（${fmt(a)}）</option>`).join("");
+
+function calc() {
+  const grade = +$("point").value;
+  const salary = SALARY.find(r => r[0] === grade)[2];
+  const base = BASE.find(b => grade >= b[0] && grade <= b[1])[2];
+  const extra = EXTRA[$("level").value] || 0;
+  const boss = Math.max(0, +$("boss").value || 0);
+  $("r-salary").textContent = fmt(salary);
+  $("r-base").textContent = fmt(base);
+  $("r-extra").textContent = fmt(extra);
+  $("r-boss").textContent = fmt(boss);
+  $("r-keep").textContent = fmt(KEEP);
+  $("r-total").textContent = fmt(salary + base + extra + boss + KEEP);
+}
+["point","level","boss"].forEach(id => $(id).addEventListener("input", calc));
+calc();
+</script>
+</body>
+</html>
