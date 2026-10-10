@@ -302,6 +302,14 @@
       showPopup(f, e.clientX, e.clientY);
     });
 
+  // 經緯線（經線每 15 度、緯線每 30 度，淺色，不擋滑鼠）
+  g.append('path').datum(d3.geoGraticule().step([15, 30])())
+    .attr('d', path).attr('fill', 'none').attr('stroke', '#5b7a99').attr('stroke-opacity', .28)
+    .attr('stroke-width', .6).attr('vector-effect', 'non-scaling-stroke').style('pointer-events', 'none');
+  g.append('path').datum({ type: 'LineString', coordinates: d3.range(-180, 181, 2).map(x => [x, 0]) })
+    .attr('d', path).attr('fill', 'none').attr('stroke', '#5b7a99').attr('stroke-opacity', .4)
+    .attr('stroke-width', .8).attr('stroke-dasharray', '4 3').attr('vector-effect', 'non-scaling-stroke').style('pointer-events', 'none');
+
   const zoom = d3.zoom().scaleExtent([1, 14])
     .translateExtent([[-20, -20], [W + 20, H + 20]])
     .on('zoom', e => { g.attr('transform', e.transform); tip.style.display = 'none'; });
