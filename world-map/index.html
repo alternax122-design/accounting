@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>互動世界地圖</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --ink: #1f2933;
@@ -13,7 +16,15 @@
     --accent: #c2410c;
     --ocean1: #dbeaf5;
     --ocean2: #b9d4e8;
+    --serif: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
   }
+  ::selection { background: rgba(194,65,12,.22); }
+  * { scrollbar-width: thin; scrollbar-color: #b6c2cf transparent; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  input { caret-color: var(--accent); }
+  dd, .intro, .suggest small { font-variant-numeric: tabular-nums; }
+  svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body {
@@ -32,11 +43,14 @@
     backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--line);
   }
-  header h1 { font-size: 18px; margin: 0; font-weight: 700; letter-spacing: .5px; }
-  header .hint { color: var(--muted); font-size: 13px; flex: 1; min-width: 160px; }
+  header h1 { font-family: var(--serif); font-size: 20px; margin: 0; font-weight: 700; letter-spacing: .04em; }
+  header .logo { width: 26px; height: 26px; color: var(--accent); }
+  header .hint { color: var(--muted); font-size: 13px; flex: 1; }
+  @media (max-width: 760px) { header .hint { display: none; } header .search { margin-left: auto; } .search input { width: 170px; } }
   .search { position: relative; }
+  .search .mag { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); width: 16px; height: 16px; pointer-events: none; }
   .search input {
-    width: 220px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px;
+    width: 240px; padding: 7px 12px 7px 34px; border: 1px solid var(--line); border-radius: 999px;
     font-size: 14px; outline: none; background: #fff;
   }
   .search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(194,65,12,.15); }
@@ -71,7 +85,8 @@
   .zoom-ctl { position: fixed; right: 16px; bottom: 24px; z-index: 10; display: flex; flex-direction: column; gap: 6px; }
   .zoom-ctl button {
     width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line);
-    background: #fff; font-size: 20px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    background: #fff; color: var(--ink); cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    display: grid; place-items: center; padding: 0;
   }
   .zoom-ctl button:hover { background: #f1f5f9; }
 
@@ -79,6 +94,7 @@
     position: fixed; left: 16px; bottom: 24px; z-index: 10; max-width: calc(100% - 90px);
     display: flex; gap: 6px; flex-wrap: wrap;
   }
+  @media (max-width: 640px) { .legend { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; right: 70px; max-width: none; } .legend button { flex: none; } }
   .legend button {
     display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px;
     border: 1px solid var(--line); background: rgba(255,255,255,.92); font-size: 13px; cursor: pointer;
@@ -100,7 +116,7 @@
   @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
   #popup .head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
   #popup .head img { width: 54px; height: 38px; object-fit: cover; border-radius: 4px; box-shadow: 0 0 0 1px var(--line); }
-  #popup h2 { margin: 0; font-size: 20px; line-height: 1.2; }
+  #popup h2 { margin: 0; font-family: var(--serif); font-size: 22px; line-height: 1.2; }
   #popup .en { color: var(--muted); font-size: 12px; }
   #popup .x {
     position: absolute; top: 8px; right: 10px; border: 0; background: none; font-size: 22px;
@@ -130,18 +146,26 @@
     border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 7px 14px; cursor: pointer; font-size: 14px;
   }
   .d-top .back:hover { background: #f1f5f9; }
-  .d-top img { width: 44px; height: 30px; object-fit: cover; border-radius: 4px; box-shadow: 0 0 0 1px var(--line); }
-  .d-top h2 { margin: 0; font-size: 22px; }
-  .d-top .en { color: var(--muted); font-size: 13px; }
-  .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; color: #fff; margin-left: 6px; vertical-align: middle; }
+  .d-top .back { display: inline-flex; align-items: center; gap: 6px; }
+  .hero {
+    position: relative; min-height: 280px; display: flex; align-items: flex-end; color: #fff;
+    background: hsl(var(--tint)) center / cover no-repeat; transition: background-image .3s;
+  }
+  .hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(15,23,42,.78), rgba(15,23,42,.08) 75%); }
+  .hero-inner { position: relative; width: 100%; max-width: 1100px; margin: 0 auto; padding: 28px 20px; display: flex; gap: 18px; align-items: flex-end; }
+  .hero .flag { width: 88px; height: 58px; object-fit: cover; border-radius: 6px; box-shadow: 0 0 0 2px rgba(255,255,255,.85), 0 6px 18px rgba(0,0,0,.35); flex: none; }
+  .hero h2 { margin: 0; font-family: var(--serif); font-size: clamp(32px, 6vw, 54px); line-height: 1.1; letter-spacing: .02em; text-shadow: 0 2px 14px rgba(0,0,0,.35); }
+  .hero .en { margin-top: 6px; font-size: 14px; opacity: .92; }
+  .tag { display: inline-block; margin-top: 10px; padding: 3px 12px; border-radius: 999px; font-size: 12px; background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.55); backdrop-filter: blur(4px); }
+  .d-body .col-main { display: flex; flex-direction: column; gap: 18px; }
 
   .d-body { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
   .d-grid { display: grid; grid-template-columns: 340px 1fr; gap: 24px; }
   @media (max-width: 800px) { .d-grid { grid-template-columns: 1fr; } }
   .panel { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
-  .panel h3 { margin: 0 0 12px; font-size: 16px; }
+  .panel h3 { margin: 0 0 12px; font-family: var(--serif); font-size: 17px; }
   #miniMap { width: 100%; height: 190px; display: block; background: var(--ocean1); border-radius: 12px; margin-bottom: 14px; }
-  .intro { line-height: 1.85; font-size: 15px; white-space: pre-line; }
+  .intro { line-height: 1.9; font-size: 15px; max-width: 68ch; white-space: pre-line; }
   .intro.loading { color: var(--muted); }
   .src { margin-top: 10px; font-size: 12px; color: var(--muted); }
   .src a { color: var(--muted); }
@@ -150,12 +174,8 @@
     border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 13px;
   }
   .chips button:hover { background: #f1f5f9; }
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
-  .stat { background: #f8fafc; border-radius: 12px; padding: 12px; }
-  .stat b { display: block; font-size: 18px; margin-top: 2px; }
-  .stat span { font-size: 12px; color: var(--muted); }
 
-  .gallery-h { margin: 28px 0 12px; font-size: 18px; }
+  .gallery-h { margin: 36px 0 14px; font-family: var(--serif); font-size: 24px; }
   .gallery { columns: 3 260px; column-gap: 14px; }
   .shot {
     break-inside: avoid; margin: 0 0 14px; background: #fff; border-radius: 14px; overflow: hidden;
@@ -181,9 +201,11 @@
 <body>
 
 <header>
-  <h1>🌍 互動世界地圖</h1>
-  <span class="hint">點擊國家查看基本資訊 · 再點一次進入詳細頁 · 滾輪縮放、拖曳移動</span>
+  <svg class="logo i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><ellipse cx="12" cy="12" rx="4.2" ry="9.5"/><path d="M2.5 12h19M4.5 7h15M4.5 17h15"/></svg>
+  <h1>互動世界地圖</h1>
+  <span class="hint">點擊國家查看基本資訊，再點一次進入詳細頁</span>
   <div class="search">
+    <svg class="mag i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
     <input id="q" type="search" placeholder="搜尋國家（中文或英文）" autocomplete="off">
     <div class="suggest" id="suggest"></div>
   </div>
@@ -192,9 +214,9 @@
 <div id="stage"><svg id="map"></svg></div>
 <div class="legend" id="legend"></div>
 <div class="zoom-ctl">
-  <button id="zin" title="放大">＋</button>
-  <button id="zout" title="縮小">－</button>
-  <button id="zreset" title="重置" style="font-size:15px">⟲</button>
+  <button id="zin" title="放大" aria-label="放大"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button id="zout" title="縮小" aria-label="縮小"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+  <button id="zreset" title="回到全圖" aria-label="回到全圖"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
 </div>
 <div id="tip"></div>
 <div id="popup"></div>
@@ -314,10 +336,13 @@
     .translateExtent([[-20, -20], [W + 20, H + 20]])
     .on('zoom', e => { g.attr('transform', e.transform); tip.style.display = 'none'; });
   svg.call(zoom).on('dblclick.zoom', null);
+  // 手機直向時地圖太小，初始放大並置中於歐亞非
+  const initial = window.innerWidth < 640 ? d3.zoomIdentity.translate(W / 2 - 2.4 * W * .55, H / 2 - 2.4 * H * .42).scale(2.4) : d3.zoomIdentity;
+  svg.call(zoom.transform, initial);
   svg.on('click', closePopup);
   document.getElementById('zin').onclick = () => svg.transition().duration(250).call(zoom.scaleBy, 1.7);
   document.getElementById('zout').onclick = () => svg.transition().duration(250).call(zoom.scaleBy, 1 / 1.7);
-  document.getElementById('zreset').onclick = () => svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+  document.getElementById('zreset').onclick = () => svg.transition().duration(500).call(zoom.transform, initial);
 
   /* ---------- 圖例（可點選洲別高亮） ---------- */
   let legendOn = null;
@@ -462,11 +487,11 @@
       .map(p => ({ title: p.title, ...p.imageinfo[0] }));
   }
   async function imagesOf(title) {
-    const url = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&generator=images&gimlimit=80&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=720&titles=${encodeURIComponent(title)}`;
+    const url = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&generator=images&gimlimit=80&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=1280&titles=${encodeURIComponent(title)}`;
     try { return parseImages(await wikiJSON(url)); } catch { return []; }
   }
   async function searchImages(term) {
-    const url = `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=30&gsrsearch=${encodeURIComponent(term)}&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=720`;
+    const url = `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=30&gsrsearch=${encodeURIComponent(term)}&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=1280`;
     try { return parseImages(await wikiJSON(url)); } catch { return []; }
   }
   function goodPhoto(p) {
@@ -497,20 +522,26 @@
     const cont = contOf(f), c = CONT[cont];
     const dens = d.pop && d.area ? nf.format(Math.round(d.pop / d.area)) + ' 人/平方公里' : '—';
     detail.innerHTML = `
-      <div class="d-top">
-        <button class="back">← 返回地圖</button>
-        <img src="${flagUrl(d, 80)}" alt="">
-        <div>
-          <h2>${esc(zhName(f))}<span class="tag" style="background:${d3.hsl(c.hue, Math.max(c.s, .3), .42).formatHex()}">${cont}</span></h2>
-          <div class="en">${esc(d.o)}${d.o !== d.n ? ' · ' + esc(d.n) : ''}</div>
+      <div class="d-top"><button class="back"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>返回地圖</button></div>
+      <section class="hero" id="hero" style="--tint:${c.hue} 38% 30%">
+        <div class="hero-inner">
+          <img class="flag" src="${flagUrl(d, 160)}" alt="">
+          <div>
+            <h2>${esc(zhName(f))}</h2>
+            <div class="en">${esc(d.o)}${d.o !== d.n ? ' · ' + esc(d.n) : ''}</div>
+            <span class="tag">${cont}</span>
+          </div>
         </div>
-      </div>
+      </section>
       <div class="d-body">
         <div class="d-grid">
           <div class="panel">
             <svg id="miniMap" viewBox="0 0 300 190"></svg>
             <dl class="kv">
               <dt>首都</dt><dd id="dCap">${esc(capText(d))}</dd>
+              <dt>人口</dt><dd>${d.pop ? nf.format(d.pop) + ' 人' : '—'}</dd>
+              <dt>面積</dt><dd>${fmtArea(d.area)}</dd>
+              <dt>人口密度</dt><dd>${dens}</dd>
               <dt>區域</dt><dd>${esc(d.sub || d.reg)}</dd>
               <dt>經緯度</dt><dd>${fmtLL(d.ll)}</dd>
               <dt>語言</dt><dd>${d.lang.length ? esc(d.lang.join('、')) : '—'}</dd>
@@ -521,12 +552,6 @@
             </dl>
           </div>
           <div>
-            <div class="stats">
-              <div class="stat"><span>人口</span><b>${fmtPop(d.pop)}</b></div>
-              <div class="stat"><span>面積</span><b>${d.area ? nf.format(Math.round(d.area)) : '—'}</b><span>平方公里</span></div>
-              <div class="stat"><span>人口密度</span><b>${dens.split(' ')[0]}</b><span>人/平方公里</span></div>
-              <div class="stat"><span>鄰國數</span><b>${d.b.length}</b></div>
-            </div>
             <div class="panel">
               <h3>國家簡介</h3>
               <div class="intro loading" id="intro">載入中…</div>
@@ -535,7 +560,7 @@
             </div>
           </div>
         </div>
-        <h2 class="gallery-h">📸 地標與知名風景</h2>
+        <h2 class="gallery-h">地標與知名風景</h2>
         <div class="gallery" id="gallery">${'<div class="skeleton"></div>'.repeat(6)}</div>
         <p class="src">照片來自維基百科 / 維基共享資源，點擊可放大並查看原始頁面與授權資訊。</p>
       </div>`;
@@ -547,8 +572,11 @@
     const mini = d3.select('#miniMap');
     let focus = f;
     if (f.geometry.type === 'MultiPolygon') {
-      const best = f.geometry.coordinates.map(c => ({ type: 'Polygon', coordinates: c })).sort((p, q) => d3.geoArea(q) - d3.geoArea(p))[0];
-      focus = best;
+      // 以最大塊陸地為中心，只取其附近（約 35°內）的島嶼來取景，避免海外領地讓國家縮成一點
+      const polys = f.geometry.coordinates.map(c => ({ type: 'Polygon', coordinates: c }));
+      const main = polys.slice().sort((p, q) => d3.geoArea(q) - d3.geoArea(p))[0];
+      const mc = d3.geoCentroid(main);
+      focus = { type: 'MultiPolygon', coordinates: polys.filter(p => d3.geoDistance(d3.geoCentroid(p), mc) < 0.6).map(p => p.coordinates) };
     }
     const mp = d3.geoNaturalEarth1().fitExtent([[10, 10], [290, 180]], focus);
     mini.append('path').datum(f).attr('d', d3.geoPath(mp)).attr('fill', fillOf(f)).attr('stroke', '#1f2933').attr('stroke-width', 1);
@@ -576,6 +604,12 @@
       const gal = document.getElementById('gallery');
       if (!list.length) { gal.outerHTML = '<div class="empty" id="gallery">找不到適合的照片，或網路無法連線到維基百科。</div>'; return; }
       gal.innerHTML = '';
+      const hi = list.findIndex(p => p.width / p.height >= 1.4);
+      if (hi >= 0) {
+        const hero = document.getElementById('hero');
+        if (hero) hero.style.backgroundImage = `url("${list[hi].thumburl}")`;
+        if (list.length > 6) list.splice(hi, 1);
+      }
       list.forEach(p => {
         const fig = document.createElement('figure');
         fig.className = 'shot';
