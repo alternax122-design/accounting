@@ -59,16 +59,20 @@
     --border:      #E8E6DC;
     --border-strong:#D6D3C6;
     --accent:      #C96442;
-    --accent-hover:#B5573A;
+    --accent-ink:  #A9482B;           /* 小字用的強調色（對比 ≥4.5:1） */
     --accent-soft: rgba(201,100,66,.10);
+    --btn-bg:      #B5573A;           /* 主按鈕底色（白字 ≥4.5:1） */
+    --btn-bg-hover:#9F4B31;
+    --on-accent:   #FFFFFF;
     --green:       #4F7A52;
-    --green-soft:  rgba(79,122,82,.10);
+    --green-soft:  rgba(79,122,82,.12);
     --red:         #B8433A;
     --red-soft:    rgba(184,67,58,.10);
     --yellow:      #B7862B;
     --text:        #141413;
     --text2:       #3D3D3A;
-    --muted:       #73726C;
+    --muted:       #6B6A64;
+    --selection:   rgba(201,100,66,.25);
     --card-r:      14px;
     --serif:       'Noto Serif TC', Georgia, serif;
     --sans:        'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -82,20 +86,25 @@
       --border:      #3E3E3A;
       --border-strong:#4D4D48;
       --accent:      #D97757;
-      --accent-hover:#E38A6C;
+      --accent-ink:  #E8987D;
       --accent-soft: rgba(217,119,87,.14);
+      --btn-bg:      #D97757;
+      --btn-bg-hover:#E38A6C;
+      --on-accent:   #1F1E1D;
       --green:       #8DBE90;
-      --green-soft:  rgba(141,190,144,.12);
+      --green-soft:  rgba(141,190,144,.14);
       --red:         #E5857A;
       --red-soft:    rgba(229,133,122,.12);
       --yellow:      #D9A84E;
       --text:        #F5F4EE;
       --text2:       #DAD8CE;
       --muted:       #A3A29C;
+      --selection:   rgba(217,119,87,.35);
       --shadow:      none;
     }
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { color-scheme: light dark; accent-color: var(--accent); }
   body {
     font-family: var(--sans);
     background: var(--bg);
@@ -104,68 +113,84 @@
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     line-height: 1.5;
+    caret-color: var(--accent);
   }
+  ::selection { background: var(--selection); }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  .ic { width: 1.25em; height: 1.25em; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 
   .wrap { max-width: 1000px; margin: 0 auto; padding: 40px 24px 80px; }
 
   /* ── 頂部 ── */
   header {
-    display: flex; align-items: flex-end; justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between;
     gap: 16px; flex-wrap: wrap;
-    padding-bottom: 24px; margin-bottom: 28px;
+    padding-bottom: 24px; margin-bottom: 24px;
     border-bottom: 1px solid var(--border);
   }
   .logo { display: flex; align-items: center; gap: 14px; }
   .logo-icon {
     width: 42px; height: 42px; border-radius: 10px;
-    background: var(--accent); color: #fff;
+    background: var(--btn-bg); color: var(--on-accent);
     display: flex; align-items: center; justify-content: center;
     font-family: var(--serif); font-size: 20px; font-weight: 600;
   }
   .logo-text { font-family: var(--serif); font-size: 26px; font-weight: 600; letter-spacing: .5px; line-height: 1.2; }
   .logo-sub  { font-size: 13px; color: var(--muted); margin-top: 2px; }
-  .header-right { display: flex; align-items: center; gap: 12px; }
-  .date-badge { font-size: 13px; color: var(--muted); }
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-  /* ── 月份選擇 ── */
-  .month-nav { display: flex; align-items: center; gap: 8px; }
-  .month-nav label { font-size: 13px; color: var(--muted); }
+  /* ── 月份切換 ── */
+  .month-nav { display: flex; align-items: center; gap: 4px; }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text2);
+    display: grid; place-items: center; cursor: pointer;
+    transition: background-color .15s, color .15s, border-color .15s;
+  }
+  .icon-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--border-strong); }
   .month-nav input[type=month] {
+    height: 36px;
     background: var(--surface); border: 1px solid var(--border);
     color: var(--text); font-family: var(--sans); font-size: 14px;
-    padding: 7px 12px; border-radius: 8px; outline: none;
+    padding: 0 12px; border-radius: 8px; outline: none;
     transition: border-color .15s, box-shadow .15s;
-    color-scheme: light dark;
   }
   .month-nav input[type=month]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
-  /* ── 統計卡片 ── */
-  .stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 24px; }
-  .stat-card {
+  /* ── 本月收支：收入 − 支出 = 結餘 ── */
+  .summary {
+    display: grid; grid-template-columns: 1fr auto 1fr auto 1.3fr; align-items: center;
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--card-r); padding: 20px 22px;
-    box-shadow: var(--shadow);
+    border-radius: var(--card-r); box-shadow: var(--shadow);
+    margin-bottom: 20px; overflow: hidden;
   }
-  .stat-label { font-size: 13px; color: var(--muted); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
-  .stat-label::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-  .stat-card.s-income  .stat-label::before { background: var(--green); }
-  .stat-card.s-expense .stat-label::before { background: var(--red); }
-  .stat-card.s-balance .stat-label::before { background: var(--accent); }
-  .stat-val   { white-space: nowrap; font-family: var(--serif); font-size: clamp(20px, 3.2vw, 28px); font-weight: 600; font-variant-numeric: lining-nums tabular-nums; letter-spacing: -.3px; }
-  .stat-val.income  { color: var(--green); }
-  .stat-val.expense { color: var(--red); }
-  .stat-val.balance { color: var(--text); }
-  .stat-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .sum-item { padding: 20px 24px; min-width: 0; }
+  .sum-op { font-family: var(--serif); font-size: 22px; line-height: 1; color: var(--border-strong); user-select: none; }
+  .sum-item.balance {
+    align-self: stretch; display: flex; flex-direction: column; justify-content: center;
+    background: var(--surface2);
+  }
+  .sum-label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .sum-val {
+    white-space: nowrap; font-family: var(--serif); font-size: 22px; font-weight: 600;
+    font-variant-numeric: lining-nums tabular-nums; letter-spacing: -.2px;
+  }
+  .sum-item.balance .sum-val { font-size: 30px; }
+  .sum-val.income  { color: var(--green); }
+  .sum-val.expense { color: var(--red); }
+  .sum-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
   /* ── 主區域 ── */
-  .main { display: grid; grid-template-columns: 1fr 400px; gap: 20px; align-items: start; }
+  .main { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 20px; align-items: start; }
 
-  /* ── 新增表單 ── */
   .form-card, .list-card {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--card-r); padding: 24px;
     box-shadow: var(--shadow);
   }
+  .form-card { position: sticky; top: 20px; transition: border-color .15s, box-shadow .15s; }
   .card-title {
     font-family: var(--serif); font-size: 18px; font-weight: 600;
     margin-bottom: 18px; display: flex; align-items: baseline; gap: 8px;
@@ -180,7 +205,7 @@
   .type-btn {
     flex: 1; padding: 8px; border-radius: 7px; border: none;
     background: transparent; color: var(--muted); font-size: 14px; font-weight: 500;
-    cursor: pointer; transition: all .15s; font-family: var(--sans);
+    cursor: pointer; transition: background-color .15s, color .15s; font-family: var(--sans);
   }
   .type-btn.active { background: var(--surface); box-shadow: 0 1px 3px rgba(20,20,19,.08); }
   .type-btn.active.expense { color: var(--red); }
@@ -189,213 +214,286 @@
 
   /* 表單欄位 */
   .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .field  { display: flex; flex-direction: column; gap: 6px; }
+  .field  { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   .field.full { grid-column: 1 / -1; }
   .field label { font-size: 13px; color: var(--text2); font-weight: 500; }
   .field input, .field select {
+    width: 100%; min-width: 0;
     background: var(--surface); border: 1px solid var(--border-strong);
     color: var(--text); font-family: var(--sans); font-size: 15px;
     padding: 9px 12px; border-radius: 8px; outline: none;
     transition: border-color .15s, box-shadow .15s;
     -webkit-appearance: none; appearance: none;
-    color-scheme: light dark;
   }
+  .field.amount input { font-size: 18px; font-weight: 600; font-variant-numeric: lining-nums tabular-nums; }
   .field select {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2373726C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px;
   }
   .field input:focus, .field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-  .field input::placeholder { color: var(--muted); opacity: .7; }
+  .field input::placeholder { color: var(--muted); opacity: .8; }
   .field select option { background: var(--surface); color: var(--text); }
 
   .btn-row { display: flex; gap: 10px; margin-top: 20px; }
   .form-card.editing { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-  .edit-hint { font-family: var(--sans); font-size: 12px; color: var(--accent); font-weight: 400; }
-  .cancel-btn { display: none; }
-  .form-card.editing .cancel-btn { display: block; }
-  .form-card.editing .export-btn:not(.cancel-btn) { display: none; }
+  .edit-hint { font-family: var(--sans); font-size: 12px; color: var(--accent-ink); font-weight: 400; }
+  .ghost-btn.cancel-btn { display: none; }
+  .form-card.editing .ghost-btn.cancel-btn { display: inline-flex; }
   .submit-btn {
     flex: 1; padding: 11px 16px;
-    background: var(--accent);
-    border: none; border-radius: 8px; color: #fff;
+    background: var(--btn-bg);
+    border: none; border-radius: 8px; color: var(--on-accent);
     font-size: 15px; font-weight: 500; font-family: var(--sans);
-    cursor: pointer; transition: background .15s;
+    cursor: pointer; transition: background-color .15s, transform .1s;
   }
-  .submit-btn:hover { background: var(--accent-hover); }
+  .submit-btn:hover { background: var(--btn-bg-hover); }
   .submit-btn:active { transform: translateY(1px); }
+  .submit-btn:disabled { opacity: .6; cursor: progress; }
 
-  .export-btn {
+  .ghost-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     padding: 11px 16px;
     background: transparent;
     border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text2);
     font-size: 14px; font-weight: 500; font-family: var(--sans);
-    cursor: pointer; transition: all .15s; white-space: nowrap;
+    cursor: pointer; transition: background-color .15s, color .15s; white-space: nowrap;
   }
-  .export-btn:hover { background: var(--surface2); color: var(--text); }
+  .ghost-btn:hover { background: var(--surface2); color: var(--text); }
+  .ghost-btn.sm { padding: 0 14px; height: 36px; }
 
   /* ── 記錄列表 ── */
   .list-card { display: flex; flex-direction: column; padding-bottom: 12px; }
-  .list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .list-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+  .list-header .card-title { margin: 0; }
   .filter-tabs { display: flex; gap: 2px; padding: 3px; background: var(--surface2); border-radius: 8px; border: 1px solid var(--border); }
   .filter-tab {
     padding: 4px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;
     border: none; background: transparent; color: var(--muted);
-    font-family: var(--sans); transition: all .15s;
+    font-family: var(--sans); transition: background-color .15s, color .15s;
   }
   .filter-tab:hover { color: var(--text); }
   .filter-tab.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(20,20,19,.08); }
 
-  .records { flex: 1; overflow-y: auto; max-height: 460px; margin: 0 -8px; padding: 0 8px; }
-  .records::-webkit-scrollbar { width: 6px; }
-  .records::-webkit-scrollbar-track { background: transparent; }
-  .records::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+  .records {
+    overflow-y: auto; min-height: 160px; max-height: min(640px, calc(100vh - 300px));
+    margin: 0 -8px; padding: 0 8px;
+    scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent;
+  }
+
+  .day-head {
+    position: sticky; top: 0; z-index: 1;
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 14px 0 6px; background: var(--surface);
+    font-size: 12px; font-weight: 500; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .day-head .day-sum { font-variant-numeric: lining-nums tabular-nums; }
 
   .record-item {
     display: flex; align-items: center; gap: 12px;
-    padding: 12px 8px; margin: 0 -8px; border-radius: 8px;
-    border-bottom: 1px solid var(--border);
-    animation: fadeIn .2s ease;
-    transition: background .15s;
+    padding: 10px 8px; margin: 0 -8px; border-radius: 8px;
+    cursor: pointer; transition: background-color .15s;
   }
-  .record-item { cursor: pointer; }
   .record-item:hover { background: var(--surface2); }
   .record-item.editing { background: var(--accent-soft); }
-  .record-item:last-child { border-bottom: none; }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
   .record-icon {
     width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center; font-size: 16px;
+    display: grid; place-items: center;
+    background: var(--surface2); color: var(--text2);
   }
-  .record-icon.expense { background: var(--red-soft); }
-  .record-icon.income  { background: var(--green-soft); }
+  .record-icon .ic { width: 18px; height: 18px; }
+  .record-icon.income { background: var(--green-soft); color: var(--green); }
+  .record-item:hover .record-icon:not(.income) { background: var(--bg); }
 
   .record-info { flex: 1; min-width: 0; }
   .record-desc { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .record-meta { font-size: 12px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .record-meta { font-size: 12px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .record-bank {
     display: inline-block; font-size: 11px; padding: 0 6px;
-    background: var(--accent-soft); color: var(--accent);
+    background: var(--accent-soft); color: var(--accent-ink);
     border-radius: 4px; margin-left: 4px;
   }
 
   .record-amount {
-    font-family: var(--serif); font-size: 15px; font-weight: 600;
+    font-size: 15px; font-weight: 600;
     font-variant-numeric: lining-nums tabular-nums;
-    text-align: right; flex-shrink: 0;
+    text-align: right; flex-shrink: 0; min-width: 76px;
   }
-  .record-amount.expense { color: var(--text); }
-  .record-amount.income  { color: var(--green); }
+  .record-amount.income { color: var(--green); }
 
-  .delete-btn, .edit-btn {
-    width: 26px; height: 26px; border-radius: 6px; border: none;
+  .row-btn {
+    width: 28px; height: 28px; border-radius: 6px; border: none;
     background: transparent; color: var(--muted); cursor: pointer;
-    font-size: 13px; display: flex; align-items: center; justify-content: center;
-    transition: all .15s; flex-shrink: 0; opacity: 0;
+    display: grid; place-items: center;
+    transition: background-color .15s, color .15s, opacity .15s; flex-shrink: 0; opacity: 0;
   }
-  .record-item:hover .delete-btn, .delete-btn:focus-visible, .record-item:hover .edit-btn, .edit-btn:focus-visible { opacity: 1; }
-  .edit-btn:hover { background: var(--accent-soft); color: var(--accent); }
-  .delete-btn:hover { background: var(--red-soft); color: var(--red); }
-  @media (hover: none) { .delete-btn, .edit-btn { opacity: 1; } }
+  .row-btn .ic { width: 16px; height: 16px; }
+  .record-item:hover .row-btn, .row-btn:focus-visible { opacity: 1; }
+  .row-btn.edit:hover { background: var(--accent-soft); color: var(--accent-ink); }
+  .row-btn.del:hover  { background: var(--red-soft); color: var(--red); }
+  @media (hover: none) { .row-btn { opacity: 1; } }
 
-  .empty-state {
-    text-align: center; padding: 48px 0; color: var(--muted);
-    font-size: 14px; line-height: 1.8;
-  }
-  .empty-icon { font-size: 32px; margin-bottom: 8px; opacity: .8; }
+  .state { text-align: center; padding: 44px 16px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+  .state .ic { width: 32px; height: 32px; margin-bottom: 10px; stroke-width: 1.5; }
+  .state .hint { font-size: 12px; }
+  .state .ghost-btn { margin-top: 14px; }
+
+  .skel { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+  .skel i { display: block; border-radius: 6px; background: var(--surface2); animation: pulse 1.4s ease-in-out infinite; }
+  .skel .a { width: 36px; height: 36px; border-radius: 50%; }
+  .skel .b { flex: 1; height: 14px; }
+  .skel .c { width: 64px; height: 14px; }
+  @keyframes pulse { 50% { opacity: .5; } }
 
   /* ── Toast 通知 ── */
   #toast {
     position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px);
+    display: flex; align-items: center; gap: 10px;
     background: var(--text); color: var(--bg);
-    border-left: 3px solid var(--accent);
     padding: 11px 20px; border-radius: 8px;
-    font-size: 14px; opacity: 0; transition: all .25s; pointer-events: none;
+    font-size: 14px; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none;
     box-shadow: 0 8px 24px rgba(20,20,19,.18); z-index: 100;
-    white-space: nowrap;
+    max-width: calc(100vw - 32px);
   }
+  #toast::before { content: ''; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--toast-c, var(--accent)); }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   /* 響應式 */
   @media (max-width: 820px) {
-    .main { grid-template-columns: 1fr; }
+    .main { grid-template-columns: minmax(0, 1fr); }
+    .form-card { position: static; }
+    .summary { grid-template-columns: minmax(0, 1fr); }
+    .sum-op { display: none; }
+    .sum-item {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+    }
+    .sum-item.balance { flex-direction: row; align-items: baseline; justify-content: space-between; border-bottom: none; }
+    .sum-label { margin: 0; }
+    .sum-body { text-align: right; }
+    .sum-item.balance .sum-val { font-size: 26px; }
+    .records { max-height: none; }
   }
   @media (max-width: 600px) {
     .wrap { padding: 24px 16px 64px; }
-    .stats { grid-template-columns: 1fr; gap: 10px; }
-    .fields { grid-template-columns: 1fr; }
+    .fields { grid-template-columns: minmax(0, 1fr); }
     .btn-row { flex-direction: column; }
-    header { align-items: flex-start; }
+    .list-card, .form-card { padding: 18px; }
+    .list-header { flex-wrap: wrap; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
   }
 </style>
 </head>
 <body>
+
+<!-- 圖示 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-food" viewBox="0 0 24 24"><path d="M7 3v8M4 3v5a3 3 0 0 0 6 0V3M7 11v10M17 21V3c-2.5 1.5-4 4-4 8h4"/></symbol>
+    <symbol id="i-bus" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="14" rx="2"/><path d="M4 11h16M8 17v3M16 17v3"/><circle cx="8" cy="14" r=".6"/><circle cx="16" cy="14" r=".6"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h14V10M10 20v-6h4v6"/></symbol>
+    <symbol id="i-bag" viewBox="0 0 24 24"><path d="M5 8h14l-1 12H6L5 8zM9 8a3 3 0 0 1 6 0"/></symbol>
+    <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></symbol>
+    <symbol id="i-pill" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/><path d="M12 8v8M8 12h8"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v14H6a2 2 0 0 0-2 2V5zM4 19a2 2 0 0 0 2 2h13v-4"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+    <symbol id="i-briefcase" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/></symbol>
+    <symbol id="i-trend" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></symbol>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19c0-8 5-14 15-14 0 10-6 15-14 15M5 19l8-8"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/></symbol>
+    <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h13v4M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2zM16 14h2"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="M3 7l9-4 9 4v10l-9 4-9-4V7zM3 7l9 4 9-4M12 11v10"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M7 7l10 10M17 8v9H8"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M7 17L17 7M8 7h9v9"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13 7l4 4"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3 13l3-8h12l3 8M3 13v6h18v-6M3 13h5a4 4 0 0 0 8 0h5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></symbol>
+  </defs>
+</svg>
+
 <div class="wrap">
 
   <!-- 頂部 -->
   <header>
     <div class="logo">
-      <div class="logo-icon">帳</div>
+      <div class="logo-icon" aria-hidden="true">帳</div>
       <div>
-        <div class="logo-text">記帳系統</div>
+        <h1 class="logo-text">記帳系統</h1>
         <div class="logo-sub" id="dateBadge"></div>
       </div>
     </div>
     <div class="header-right">
-      <!-- 月份選擇 -->
       <div class="month-nav">
-        <label for="monthPicker">查看月份</label>
+        <button class="icon-btn" type="button" onclick="shiftMonth(-1)" aria-label="上個月"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg></button>
+        <label class="sr-only" for="monthPicker">查看月份</label>
         <input type="month" id="monthPicker">
+        <button class="icon-btn" type="button" onclick="shiftMonth(1)" aria-label="下個月"><svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></button>
       </div>
+      <button class="ghost-btn sm" type="button" onclick="exportReport()"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg>匯出報表</button>
     </div>
   </header>
 
-  <!-- 統計 -->
-  <div class="stats">
-    <div class="stat-card s-income">
-      <div class="stat-label">本月收入</div>
-      <div class="stat-val income" id="statIncome">NT$ 0</div>
-      <div class="stat-sub" id="statIncomeCount">0 筆</div>
+  <!-- 本月收支：收入 − 支出 = 結餘 -->
+  <section class="summary" aria-label="本月收支">
+    <div class="sum-item">
+      <div class="sum-label">本月收入</div>
+      <div class="sum-body">
+        <div class="sum-val income" id="statIncome">—</div>
+        <div class="sum-sub" id="statIncomeCount">&nbsp;</div>
+      </div>
     </div>
-    <div class="stat-card s-expense">
-      <div class="stat-label">本月支出</div>
-      <div class="stat-val expense" id="statExpense">NT$ 0</div>
-      <div class="stat-sub" id="statExpenseCount">0 筆</div>
+    <div class="sum-op" aria-hidden="true">−</div>
+    <div class="sum-item">
+      <div class="sum-label">本月支出</div>
+      <div class="sum-body">
+        <div class="sum-val expense" id="statExpense">—</div>
+        <div class="sum-sub" id="statExpenseCount">&nbsp;</div>
+      </div>
     </div>
-    <div class="stat-card s-balance">
-      <div class="stat-label">本月結餘</div>
-      <div class="stat-val balance" id="statBalance">NT$ 0</div>
-      <div class="stat-sub" id="statRate">儲蓄率 —</div>
+    <div class="sum-op" aria-hidden="true">=</div>
+    <div class="sum-item balance">
+      <div class="sum-label">本月結餘</div>
+      <div class="sum-body">
+        <div class="sum-val" id="statBalance">—</div>
+        <div class="sum-sub" id="statRate">儲蓄率 —</div>
+      </div>
     </div>
-  </div>
+  </section>
 
   <!-- 主區域 -->
   <div class="main">
 
     <!-- 新增表單 -->
     <div class="form-card" id="formCard">
-      <div class="card-title" id="formTitle">新增一筆</div>
+      <h2 class="card-title" id="formTitle">新增一筆</h2>
 
       <div class="type-toggle">
-        <button class="type-btn active expense" id="btnExpense" onclick="setType('支出')">支出</button>
-        <button class="type-btn income"          id="btnIncome"  onclick="setType('收入')">收入</button>
+        <button type="button" class="type-btn active expense" id="btnExpense" aria-pressed="true"  onclick="setType('支出')">支出</button>
+        <button type="button" class="type-btn income"         id="btnIncome"  aria-pressed="false" onclick="setType('收入')">收入</button>
       </div>
 
       <div class="fields">
         <div class="field">
-          <label>日期</label>
+          <label for="fDate">日期</label>
           <input type="date" id="fDate">
         </div>
-        <div class="field">
-          <label>金額（NT$）</label>
-          <input type="number" id="fAmount" placeholder="0" min="0">
+        <div class="field amount">
+          <label for="fAmount">金額（NT$）</label>
+          <input type="number" id="fAmount" placeholder="0" min="0" step="any" inputmode="decimal">
         </div>
         <div class="field">
-          <label>分類</label>
+          <label for="fCategory">分類</label>
           <select id="fCategory"></select>
         </div>
         <div class="field">
-          <label>銀行</label>
+          <label for="fBank">銀行</label>
           <select id="fBank">
             <option value="">— 略過 —</option>
             <option>台銀</option><option>國泰</option><option>玉山</option>
@@ -404,46 +502,49 @@
           </select>
         </div>
         <div class="field">
-          <label>付款方式</label>
+          <label for="fPayment">付款方式</label>
           <select id="fPayment">
             <option>現金</option><option>信用卡</option><option>LINE Pay</option>
             <option>街口支付</option><option>轉帳</option><option>其他</option>
           </select>
         </div>
         <div class="field">
-          <label>項目說明</label>
+          <label for="fDesc">項目說明</label>
           <input type="text" id="fDesc" placeholder="例：早餐、捷運...">
         </div>
         <div class="field full">
-          <label>備註</label>
+          <label for="fNote">備註</label>
           <input type="text" id="fNote" placeholder="選填">
         </div>
       </div>
 
       <div class="btn-row">
-        <button class="submit-btn" id="submitBtn" onclick="addRecord()">新增記帳</button>
-        <button class="export-btn cancel-btn" onclick="cancelEdit()">取消</button>
-        <button class="export-btn" onclick="exportReport()">匯出報表</button>
+        <button type="button" class="submit-btn" id="submitBtn" onclick="addRecord()">新增記帳</button>
+        <button type="button" class="ghost-btn cancel-btn" onclick="cancelEdit()">取消</button>
       </div>
     </div>
 
     <!-- 記錄列表 -->
     <div class="list-card">
       <div class="list-header">
-        <div class="card-title" style="margin:0">本月記錄</div>
+        <h2 class="card-title">本月記錄 <span id="listCount"></span></h2>
         <div class="filter-tabs">
-          <button class="filter-tab active" onclick="setFilter('all',this)">全部</button>
-          <button class="filter-tab" onclick="setFilter('支出',this)">支出</button>
-          <button class="filter-tab" onclick="setFilter('收入',this)">收入</button>
+          <button type="button" class="filter-tab active" onclick="setFilter('all',this)">全部</button>
+          <button type="button" class="filter-tab" onclick="setFilter('支出',this)">支出</button>
+          <button type="button" class="filter-tab" onclick="setFilter('收入',this)">收入</button>
         </div>
       </div>
-      <div class="records" id="recordList"></div>
+      <div class="records" id="recordList" aria-live="polite">
+        <div class="skel"><i class="a"></i><i class="b"></i><i class="c"></i></div>
+        <div class="skel"><i class="a"></i><i class="b"></i><i class="c"></i></div>
+        <div class="skel"><i class="a"></i><i class="b"></i><i class="c"></i></div>
+      </div>
     </div>
 
   </div>
 </div>
 
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script>
 // ── 資料 ──────────────────────────────────────────────────────
@@ -451,57 +552,107 @@ const CATS = {
   支出: ['餐飲','交通','住房','購物','娛樂','醫療','教育','旅遊','保健食品','訂閱','其他支出'],
   收入: ['薪資','投資收益','其他收入'],
 };
+// 匯出報表使用
 const ICONS = {
   餐飲:'🍜', 交通:'🚌', 住房:'🏠', 購物:'🛍️', 娛樂:'🎬',
   醫療:'💊', 教育:'📚', 旅遊:'✈️', 薪資:'💼', 投資收益:'📈',
   保健食品:'🧴', 訂閱:'🔁', 其他收入:'💵', 其他支出:'📦',
 };
+// 介面使用的線條圖示（對應上方 SVG symbol）
+const CAT_ICON = {
+  餐飲:'food', 交通:'bus', 住房:'home', 購物:'bag', 娛樂:'film',
+  醫療:'pill', 教育:'book', 旅遊:'globe', 薪資:'briefcase', 投資收益:'trend',
+  保健食品:'leaf', 訂閱:'repeat', 其他收入:'wallet', 其他支出:'box',
+};
+const svg = name => `<svg class="ic" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const WEEK = ['日','一','二','三','四','五','六'];
+
+// 以本地時區取日期（toISOString 是 UTC，台灣凌晨會差一天）
+const pad = n => String(n).padStart(2,'0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 
 let currentType   = '支出';
 let currentFilter = 'all';
 let _records      = [];   // 本地快取
 let editingId     = null; // 編輯中的記錄 docId
+let saving        = false;
+let started       = false;
 
 // ── 初始化 ────────────────────────────────────────────────────
 window._initApp = async () => {
+  if (started) return;
+  started = true;
+
   const now = new Date();
   document.getElementById('dateBadge').textContent =
     now.toLocaleDateString('zh-TW', {year:'numeric', month:'long', day:'numeric', weekday:'short'});
-  document.getElementById('fDate').value = now.toISOString().slice(0,10);
+  document.getElementById('fDate').value = ymd(now);
 
   const mp = document.getElementById('monthPicker');
-  mp.value = now.toISOString().slice(0,7);
+  mp.value = ymd(now).slice(0,7);
   mp.addEventListener('change', () => { updateStats(); renderList(); });
 
-  updateCats();
+  // 在欄位內按 Enter 即送出
+  document.getElementById('formCard').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); addRecord(); }
+  });
 
-  // 載入 Firebase 資料
-  toast('載入資料中…', 'var(--muted)');
-  _records = await window._fbGetRecords();
+  updateCats();
+  loadRecords();
+};
+
+async function loadRecords() {
+  document.getElementById('recordList').innerHTML =
+    '<div class="skel"><i class="a"></i><i class="b"></i><i class="c"></i></div>'.repeat(3);
+  try {
+    _records = await window._fbGetRecords();
+  } catch (e) {
+    document.getElementById('recordList').innerHTML = `
+      <div class="state">${svg('alert')}<div>資料載入失敗</div>
+        <div class="hint">請檢查網路連線後再試一次</div>
+        <button type="button" class="ghost-btn" onclick="loadRecords()">重新載入</button>
+      </div>`;
+    return;
+  }
   updateStats();
   renderList();
-};
+}
 
 window.onload = () => {
   if (window._fbReady) window._initApp();
   // 否則等 Firebase module 載入完再由 _fbReady callback 呼叫
 };
 
+// ── 月份切換 ──────────────────────────────────────────────────
+function shiftMonth(delta) {
+  const mp = document.getElementById('monthPicker');
+  const [y, m] = mp.value.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  mp.value = `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+  updateStats();
+  renderList();
+}
+
 // ── 類型切換 ──────────────────────────────────────────────────
 function setType(t) {
   currentType = t;
-  document.getElementById('btnExpense').className = 'type-btn' + (t==='支出' ? ' active expense' : '');
-  document.getElementById('btnIncome').className  = 'type-btn' + (t==='收入' ? ' active income'  : '');
+  const be = document.getElementById('btnExpense'), bi = document.getElementById('btnIncome');
+  be.className = 'type-btn expense' + (t==='支出' ? ' active' : '');
+  bi.className = 'type-btn income'  + (t==='收入' ? ' active' : '');
+  be.setAttribute('aria-pressed', t==='支出');
+  bi.setAttribute('aria-pressed', t==='收入');
   updateCats();
 }
 
 function updateCats() {
   const sel = document.getElementById('fCategory');
-  sel.innerHTML = CATS[currentType].map(c => `<option>${c}</option>`).join('');
+  sel.innerHTML = CATS[currentType].map(c => `<option>${esc(c)}</option>`).join('');
 }
 
 // ── 新增 / 儲存修改 ───────────────────────────────────────────
 async function addRecord() {
+  if (saving) return;
   const date   = document.getElementById('fDate').value;
   const amount = parseFloat(document.getElementById('fAmount').value);
   const cat    = document.getElementById('fCategory').value;
@@ -511,7 +662,9 @@ async function addRecord() {
   const note   = document.getElementById('fNote').value.trim();
 
   if (!date || !amount || amount <= 0) {
-    toast('請填寫日期與金額', 'var(--yellow)'); return;
+    toast('請填寫日期與金額', 'var(--yellow)');
+    document.getElementById('fAmount').focus();
+    return;
   }
 
   const fields = {
@@ -520,37 +673,40 @@ async function addRecord() {
     desc: desc || cat, note, amount,
   };
 
-  if (editingId) {
-    toast('儲存中…', 'var(--muted)');
-    try {
+  const btn = document.getElementById('submitBtn');
+  saving = true; btn.disabled = true;
+  try {
+    if (editingId) {
       await window._fbUpdateRecord(editingId, fields);
-    } catch (e) {
-      toast('儲存失敗，請再試一次', 'var(--red)'); return;
+      const r = _records.find(r => r._docId === editingId);
+      Object.assign(r, fields);
+      _records.sort((a,b) => a.date.localeCompare(b.date));
+      saving = false; btn.disabled = false;
+      cancelEdit();
+      updateStats();
+      renderList();
+      toast(`已更新：${fields.desc}　NT$ ${amount.toLocaleString()}`);
+      return;
     }
-    const r = _records.find(r => r._docId === editingId);
-    Object.assign(r, fields);
+
+    const record = { ...fields, createdAt: Date.now() };
+    record._docId = await window._fbAddRecord(record);
+    _records.push(record);
     _records.sort((a,b) => a.date.localeCompare(b.date));
-    cancelEdit();
+
+    document.getElementById('fAmount').value = '';
+    document.getElementById('fDesc').value   = '';
+    document.getElementById('fNote').value   = '';
+
     updateStats();
     renderList();
-    toast(`已更新：${fields.desc}　NT$ ${amount.toLocaleString()}`);
-    return;
+    toast(`已記錄：${record.desc}　NT$ ${amount.toLocaleString()}`);
+    document.getElementById('fAmount').focus({ preventScroll: true });
+  } catch (e) {
+    toast('儲存失敗，請再試一次', 'var(--red)');
+  } finally {
+    saving = false; btn.disabled = false;
   }
-
-  const record = { ...fields, createdAt: Date.now() };
-
-  toast('儲存中…', 'var(--muted)');
-  const docId = await window._fbAddRecord(record);
-  record._docId = docId;
-  _records.push(record);
-
-  document.getElementById('fAmount').value = '';
-  document.getElementById('fDesc').value   = '';
-  document.getElementById('fNote').value   = '';
-
-  updateStats();
-  renderList();
-  toast(`已記錄：${record.desc}　NT$ ${amount.toLocaleString()}`);
 }
 
 // ── 編輯 ──────────────────────────────────────────────────────
@@ -560,7 +716,7 @@ function startEdit(docId) {
   editingId = docId;
   setType(r.type);
   const sel = document.getElementById('fCategory');
-  if (!CATS[r.type].includes(r.category)) sel.insertAdjacentHTML('beforeend', `<option>${r.category}</option>`);
+  if (!CATS[r.type].includes(r.category)) sel.insertAdjacentHTML('beforeend', `<option>${esc(r.category)}</option>`);
   sel.value = r.category;
   document.getElementById('fDate').value    = r.date;
   document.getElementById('fAmount').value  = r.amount;
@@ -573,7 +729,7 @@ function startEdit(docId) {
   document.getElementById('formTitle').innerHTML = '編輯記錄 <span class="edit-hint">修改後按「儲存修改」</span>';
   document.getElementById('submitBtn').textContent = '儲存修改';
   renderList();
-  document.getElementById('formCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('formCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   document.getElementById('fAmount').focus({ preventScroll: true });
 }
 
@@ -582,7 +738,7 @@ function cancelEdit() {
   document.getElementById('formCard').classList.remove('editing');
   document.getElementById('formTitle').textContent = '新增一筆';
   document.getElementById('submitBtn').textContent = '新增記帳';
-  document.getElementById('fDate').value   = new Date().toISOString().slice(0,10);
+  document.getElementById('fDate').value   = ymd(new Date());
   document.getElementById('fAmount').value  = '';
   document.getElementById('fBank').value    = '';
   document.getElementById('fPayment').value = '現金';
@@ -595,7 +751,11 @@ function cancelEdit() {
 // ── 刪除 ──────────────────────────────────────────────────────
 async function deleteRecord(docId) {
   if (docId === editingId) cancelEdit();
-  await window._fbDeleteRecord(docId);
+  try {
+    await window._fbDeleteRecord(docId);
+  } catch (e) {
+    toast('刪除失敗，請再試一次', 'var(--red)'); return;
+  }
   _records = _records.filter(r => r._docId !== docId);
   updateStats();
   renderList();
@@ -628,50 +788,59 @@ function updateStats() {
   document.getElementById('statBalance').style.color       = balance >= 0 ? 'var(--text)' : 'var(--red)';
 }
 
-// ── 渲染列表 ──────────────────────────────────────────────────
+// ── 渲染列表（依日期分組） ────────────────────────────────────
 function renderList() {
   const month = document.getElementById('monthPicker').value;
-  let records = _records
-    .filter(r => r.date.startsWith(month))
+  const monthRecords = _records.filter(r => r.date.startsWith(month));
+  const records = monthRecords
     .filter(r => currentFilter === 'all' || r.type === currentFilter)
     .slice().reverse();
 
+  document.getElementById('listCount').textContent = monthRecords.length ? `共 ${records.length} 筆` : '';
+
   const el = document.getElementById('recordList');
   if (!records.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div>本月尚無記錄<br><span style="font-size:12px">從左側新增第一筆記帳吧</span></div>`;
+    el.innerHTML = monthRecords.length
+      ? `<div class="state">${svg('inbox')}<div>沒有符合的${esc(currentFilter)}記錄</div></div>`
+      : `<div class="state">${svg('inbox')}<div>本月尚無記錄</div><div class="hint">在表單填入金額，按 Enter 即可新增第一筆</div></div>`;
     return;
   }
 
-  el.innerHTML = records.map(r => `
-    <div class="record-item${r._docId===editingId?' editing':''}" onclick="startEdit('${r._docId}')" title="點一下編輯">
-      <div class="record-icon ${r.type==='支出'?'expense':'income'}">
-        ${ICONS[r.category] || (r.type==='支出'?'💸':'💰')}
-      </div>
+  let html = '', lastDate = '';
+  records.forEach((r, i) => {
+    if (r.date !== lastDate) {
+      lastDate = r.date;
+      const [y, m, d] = r.date.split('-').map(Number);
+      const spent = records.filter(x => x.date === r.date && x.type === '支出').reduce((s,x) => s+x.amount, 0);
+      html += `<div class="day-head"><span>${m}/${d}　週${WEEK[new Date(y, m-1, d).getDay()]}</span>` +
+              (spent ? `<span class="day-sum">支出 NT$ ${spent.toLocaleString()}</span>` : '') + `</div>`;
+    }
+    const isExp = r.type === '支出';
+    const id = esc(r._docId);
+    html += `
+    <div class="record-item${r._docId===editingId?' editing':''}" onclick="startEdit('${id}')" title="點一下編輯">
+      <div class="record-icon ${isExp?'expense':'income'}">${svg(CAT_ICON[r.category] || (isExp?'down':'up'))}</div>
       <div class="record-info">
-        <div class="record-desc">${r.desc}</div>
-        <div class="record-meta">
-          ${r.date.slice(5).replace('-','/')}
-          · ${r.category}
-          · ${r.payment}
-          ${r.bank ? `<span class="record-bank">${r.bank}</span>` : ''}
-        </div>
+        <div class="record-desc">${esc(r.desc)}</div>
+        <div class="record-meta">${esc(r.category)} · ${esc(r.payment)}${r.bank ? `<span class="record-bank">${esc(r.bank)}</span>` : ''}</div>
       </div>
-      <div class="record-amount ${r.type==='支出'?'expense':'income'}">
-        ${r.type==='支出'?'-':'+'}${r.amount.toLocaleString()}
-      </div>
-      <button class="edit-btn" onclick="event.stopPropagation(); startEdit('${r._docId}')" title="編輯">✎</button>
-      <button class="delete-btn" onclick="event.stopPropagation(); deleteRecord('${r._docId}')" title="刪除">✕</button>
-    </div>
-  `).join('');
+      <button type="button" class="row-btn edit" onclick="event.stopPropagation(); startEdit('${id}')" aria-label="編輯 ${esc(r.desc)}" title="編輯">${svg('edit')}</button>
+      <button type="button" class="row-btn del" onclick="event.stopPropagation(); deleteRecord('${id}')" aria-label="刪除 ${esc(r.desc)}" title="刪除">${svg('x')}</button>
+      <div class="record-amount ${isExp?'expense':'income'}">${isExp?'−':'+'}${r.amount.toLocaleString()}</div>
+    </div>`;
+  });
+  el.innerHTML = html;
 }
 
 // ── Toast ─────────────────────────────────────────────────────
+let _toastTimer;
 function toast(msg, color) {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.style.borderLeftColor = color || 'var(--accent)';
+  t.style.setProperty('--toast-c', color || 'var(--accent)');
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
 }
 
 // ── 匯出圖表報表 ──────────────────────────────────────────────
