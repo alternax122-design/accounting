@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>互動世界地圖</title>
+<style>
+  :root {
+    --ink: #1f2933;
+    --muted: #64748b;
+    --card: #ffffff;
+    --line: #e2e8f0;
+    --accent: #c2410c;
+    --ocean1: #dbeaf5;
+    --ocean2: #b9d4e8;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--ocean1);
+    overflow: hidden;
+  }
+
+  /* ---------- 頂部列 ---------- */
+  header {
+    position: fixed; z-index: 20; top: 0; left: 0; right: 0;
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    padding: 10px 16px;
+    background: rgba(255,255,255,.88);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 18px; margin: 0; font-weight: 700; letter-spacing: .5px; }
+  header .hint { color: var(--muted); font-size: 13px; flex: 1; min-width: 160px; }
+  .search { position: relative; }
+  .search input {
+    width: 220px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px;
+    font-size: 14px; outline: none; background: #fff;
+  }
+  .search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(194,65,12,.15); }
+  .suggest {
+    position: absolute; top: 38px; left: 0; right: 0; background: #fff; border: 1px solid var(--line);
+    border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.15); overflow: hidden; display: none; max-height: 300px; overflow-y: auto;
+  }
+  .suggest button {
+    display: flex; gap: 8px; align-items: center; width: 100%; text-align: left;
+    border: 0; background: none; padding: 8px 12px; cursor: pointer; font-size: 14px;
+  }
+  .suggest button:hover { background: #f1f5f9; }
+  .suggest img { width: 22px; height: 15px; object-fit: cover; border-radius: 2px; }
+  .suggest small { color: var(--muted); }
+
+  /* ---------- 地圖 ---------- */
+  #stage {
+    position: fixed; inset: 0; padding-top: 58px;
+    background: radial-gradient(ellipse at 50% 40%, var(--ocean1), var(--ocean2));
+  }
+  #map { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+  #map:active { cursor: grabbing; }
+  .country {
+    stroke: #fff; stroke-width: .6; vector-effect: non-scaling-stroke;
+    cursor: pointer; transition: opacity .15s, filter .15s;
+  }
+  .country:hover { filter: brightness(1.12) saturate(1.1); stroke: #1f2933; stroke-width: 1.2; }
+  .country.selected { stroke: #1f2933; stroke-width: 2; }
+  .country.dim { opacity: .25; }
+  .country.nodata { fill: #cbd5e1; }
+
+  .zoom-ctl { position: fixed; right: 16px; bottom: 24px; z-index: 10; display: flex; flex-direction: column; gap: 6px; }
+  .zoom-ctl button {
+    width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line);
+    background: #fff; font-size: 20px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  }
+  .zoom-ctl button:hover { background: #f1f5f9; }
+
+  .legend {
+    position: fixed; left: 16px; bottom: 24px; z-index: 10; max-width: calc(100% - 90px);
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .legend button {
+    display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px;
+    border: 1px solid var(--line); background: rgba(255,255,255,.92); font-size: 13px; cursor: pointer;
+  }
+  .legend button.on { border-color: var(--ink); box-shadow: 0 0 0 2px rgba(31,41,51,.15); }
+  .legend i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+
+  #tip {
+    position: fixed; z-index: 30; pointer-events: none; background: rgba(31,41,51,.92); color: #fff;
+    padding: 4px 9px; border-radius: 6px; font-size: 13px; display: none; white-space: nowrap;
+  }
+
+  /* ---------- 基本資訊對話框 ---------- */
+  #popup {
+    position: fixed; z-index: 40; width: 300px; background: var(--card); border-radius: 16px;
+    box-shadow: 0 18px 50px rgba(0,0,0,.28); padding: 16px; display: none;
+    animation: pop .18s ease-out;
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+  #popup .head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+  #popup .head img { width: 54px; height: 38px; object-fit: cover; border-radius: 4px; box-shadow: 0 0 0 1px var(--line); }
+  #popup h2 { margin: 0; font-size: 20px; line-height: 1.2; }
+  #popup .en { color: var(--muted); font-size: 12px; }
+  #popup .x {
+    position: absolute; top: 8px; right: 10px; border: 0; background: none; font-size: 22px;
+    color: var(--muted); cursor: pointer; line-height: 1;
+  }
+  dl.kv { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 14px; }
+  dl.kv dt { color: var(--muted); }
+  dl.kv dd { margin: 0; }
+  #popup .go {
+    margin-top: 14px; width: 100%; padding: 10px; border: 0; border-radius: 10px; cursor: pointer;
+    background: var(--accent); color: #fff; font-size: 15px; font-weight: 600;
+  }
+  #popup .go:hover { filter: brightness(1.08); }
+  #popup .tiny { margin: 8px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
+
+  /* ---------- 詳細頁 ---------- */
+  #detail {
+    position: fixed; inset: 0; z-index: 50; background: #f8fafc; overflow-y: auto; display: none;
+    animation: fade .2s ease-out;
+  }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  .d-top {
+    position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 14px;
+    padding: 12px 20px; background: rgba(248,250,252,.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
+  }
+  .d-top .back {
+    border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 7px 14px; cursor: pointer; font-size: 14px;
+  }
+  .d-top .back:hover { background: #f1f5f9; }
+  .d-top img { width: 44px; height: 30px; object-fit: cover; border-radius: 4px; box-shadow: 0 0 0 1px var(--line); }
+  .d-top h2 { margin: 0; font-size: 22px; }
+  .d-top .en { color: var(--muted); font-size: 13px; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; color: #fff; margin-left: 6px; vertical-align: middle; }
+
+  .d-body { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+  .d-grid { display: grid; grid-template-columns: 340px 1fr; gap: 24px; }
+  @media (max-width: 800px) { .d-grid { grid-template-columns: 1fr; } }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+  .panel h3 { margin: 0 0 12px; font-size: 16px; }
+  #miniMap { width: 100%; height: 190px; display: block; background: var(--ocean1); border-radius: 12px; margin-bottom: 14px; }
+  .intro { line-height: 1.85; font-size: 15px; white-space: pre-line; }
+  .intro.loading { color: var(--muted); }
+  .src { margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .src a { color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips button {
+    border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 13px;
+  }
+  .chips button:hover { background: #f1f5f9; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .stat { background: #f8fafc; border-radius: 12px; padding: 12px; }
+  .stat b { display: block; font-size: 18px; margin-top: 2px; }
+  .stat span { font-size: 12px; color: var(--muted); }
+
+  .gallery-h { margin: 28px 0 12px; font-size: 18px; }
+  .gallery { columns: 3 260px; column-gap: 14px; }
+  .shot {
+    break-inside: avoid; margin: 0 0 14px; background: #fff; border-radius: 14px; overflow: hidden;
+    border: 1px solid var(--line); cursor: zoom-in; transition: transform .15s, box-shadow .15s;
+  }
+  .shot:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.12); }
+  .shot img { width: 100%; display: block; background: #e2e8f0; min-height: 90px; }
+  .shot figcaption { padding: 8px 12px 10px; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+  .skeleton { height: 160px; border-radius: 14px; margin-bottom: 14px; break-inside: avoid;
+    background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%); background-size: 200% 100%; animation: sh 1.2s infinite; }
+  @keyframes sh { to { background-position: -200% 0; } }
+  .empty { color: var(--muted); padding: 20px 0; }
+
+  #lightbox {
+    position: fixed; inset: 0; z-index: 60; background: rgba(15,23,42,.92); display: none;
+    align-items: center; justify-content: center; flex-direction: column; gap: 12px; padding: 24px; cursor: zoom-out;
+  }
+  #lightbox img { max-width: 100%; max-height: 82vh; border-radius: 8px; }
+  #lightbox p { color: #e2e8f0; margin: 0; font-size: 14px; text-align: center; }
+  #lightbox a { color: #93c5fd; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌍 互動世界地圖</h1>
+  <span class="hint">點擊國家查看基本資訊 · 再點一次進入詳細頁 · 滾輪縮放、拖曳移動</span>
+  <div class="search">
+    <input id="q" type="search" placeholder="搜尋國家（中文或英文）" autocomplete="off">
+    <div class="suggest" id="suggest"></div>
+  </div>
+</header>
+
+<div id="stage"><svg id="map"></svg></div>
+<div class="legend" id="legend"></div>
+<div class="zoom-ctl">
+  <button id="zin" title="放大">＋</button>
+  <button id="zout" title="縮小">－</button>
+  <button id="zreset" title="重置" style="font-size:15px">⟲</button>
+</div>
+<div id="tip"></div>
+<div id="popup"></div>
+<div id="detail"></div>
+<div id="lightbox"></div>
+
+<script src="vendor/d3.min.js"></script>
+<script src="vendor/topojson-client.min.js"></script>
+<script src="data.js"></script>
+<script>
+(() => {
+  'use strict';
+  const D = window.COUNTRIES;
+  const topo = window.WORLD_TOPO;
+  const features = topojson.feature(topo, topo.objects.countries).features;
+
+  /* ---------- 名稱、洲別 ---------- */
+  const regionNames = (() => { try { return new Intl.DisplayNames(['zh-TW'], { type: 'region' }); } catch { return null; } })();
+  const zhExtra = { XK: '科索沃', 'Somaliland': '索馬利蘭', 'N. Cyprus': '北賽普勒斯',
+                    'Siachen Glacier': '錫亞琴冰川', 'Indian Ocean Ter.': '印度洋領地' };
+  function zhName(f) {
+    const d = D[f.id];
+    if (!d) return zhExtra[f.properties.name] || f.properties.name;
+    if (zhExtra[d.a2]) return zhExtra[d.a2];
+    try { const n = regionNames && regionNames.of(d.a2); if (n && n !== d.a2) return n; } catch {}
+    return d.n;
+  }
+  const enName = f => (D[f.id] ? D[f.id].n : f.properties.name);
+
+  const CONT = {
+    '亞洲':   { hue: 8,   s: .62 },
+    '歐洲':   { hue: 215, s: .58 },
+    '非洲':   { hue: 40,  s: .75 },
+    '北美洲': { hue: 138, s: .45 },
+    '南美洲': { hue: 172, s: .55 },
+    '大洋洲': { hue: 282, s: .45 },
+    '南極洲': { hue: 200, s: .25 },
+    '其他':   { hue: 215, s: .05 },
+  };
+  function continentOf(d) {
+    if (!d) return '其他';
+    switch (d.reg) {
+      case 'Asia': return '亞洲';
+      case 'Europe': return '歐洲';
+      case 'Africa': return '非洲';
+      case 'Oceania': return '大洋洲';
+      case 'Antarctic': return '南極洲';
+      case 'Americas': return d.sub === 'South America' ? '南美洲' : '北美洲';
+    }
+    return '其他';
+  }
+  const contOf = f => continentOf(D[f.id]);
+
+  /* ---------- 上色：同洲同色系，相鄰國家不同色階 ---------- */
+  const SHADES = [[0,.60],[9,.46],[-9,.74],[5,.38],[-6,.54],[11,.82]];
+  const shadeIdx = {};
+  const byA3 = {};
+  features.forEach(f => { if (D[f.id]) byA3[D[f.id].a3] = f; });
+  [...features].sort((a, b) => String(a.id).localeCompare(String(b.id))).forEach(f => {
+    const d = D[f.id]; if (!d) return;
+    const used = new Set();
+    d.b.forEach(a3 => { const nf = byA3[a3]; if (nf && shadeIdx[nf.id] !== undefined) used.add(shadeIdx[nf.id]); });
+    // 反向（別人把我列為鄰國）
+    Object.values(D).forEach(o => { if (o.b.includes(d.a3) && byA3[o.a3] && shadeIdx[byA3[o.a3].id] !== undefined) used.add(shadeIdx[byA3[o.a3].id]); });
+    let i = 0; while (used.has(i) && i < SHADES.length - 1) i++;
+    shadeIdx[f.id] = i;
+  });
+  function fillOf(f) {
+    const d = D[f.id]; if (!d) return '#cbd5e1';
+    const c = CONT[contOf(f)];
+    const [dh, l] = SHADES[shadeIdx[f.id] ?? 0];
+    return d3.hsl(c.hue + dh, c.s, l).formatHex();
+  }
+
+  /* ---------- 地圖 ---------- */
+  const W = 1000;
+  const projection = d3.geoNaturalEarth1();
+  const sphere = { type: 'Sphere' };
+  projection.fitWidth(W, sphere);
+  const path = d3.geoPath(projection);
+  const H = Math.ceil(path.bounds(sphere)[1][1]);
+
+  const svg = d3.select('#map').attr('viewBox', `0 0 ${W} ${H}`).attr('preserveAspectRatio', 'xMidYMid meet');
+  const g = svg.append('g');
+  g.append('path').attr('d', path(sphere)).attr('fill', '#eaf3fa').attr('stroke', '#9db8cc').attr('stroke-width', .8).style('pointer-events', 'none');
+
+  const tip = document.getElementById('tip');
+  const popup = document.getElementById('popup');
+  let selectedId = null;
+
+  const paths = g.selectAll('path.country').data(features).join('path')
+    .attr('class', f => 'country' + (D[f.id] ? '' : ' nodata'))
+    .attr('d', path)
+    .attr('fill', fillOf)
+    .on('mousemove', (e, f) => {
+      tip.style.display = 'block';
+      tip.textContent = zhName(f);
+      tip.style.left = (e.clientX + 14) + 'px';
+      tip.style.top = (e.clientY + 14) + 'px';
+    })
+    .on('mouseleave', () => { tip.style.display = 'none'; })
+    .on('click', (e, f) => {
+      e.stopPropagation();
+      if (selectedId === f.id && popup.style.display === 'block' && D[f.id]) return openDetail(f);
+      showPopup(f, e.clientX, e.clientY);
+    });
+
+  const zoom = d3.zoom().scaleExtent([1, 14])
+    .translateExtent([[-20, -20], [W + 20, H + 20]])
+    .on('zoom', e => { g.attr('transform', e.transform); tip.style.display = 'none'; });
+  svg.call(zoom).on('dblclick.zoom', null);
+  svg.on('click', closePopup);
+  document.getElementById('zin').onclick = () => svg.transition().duration(250).call(zoom.scaleBy, 1.7);
+  document.getElementById('zout').onclick = () => svg.transition().duration(250).call(zoom.scaleBy, 1 / 1.7);
+  document.getElementById('zreset').onclick = () => svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+
+  /* ---------- 圖例（可點選洲別高亮） ---------- */
+  let legendOn = null;
+  const legend = document.getElementById('legend');
+  ['亞洲', '歐洲', '非洲', '北美洲', '南美洲', '大洋洲', '南極洲'].forEach(name => {
+    const c = CONT[name];
+    const b = document.createElement('button');
+    b.innerHTML = `<i style="background:${d3.hsl(c.hue, c.s, .55).formatHex()}"></i>${name}`;
+    b.onclick = () => {
+      legendOn = legendOn === name ? null : name;
+      [...legend.children].forEach(x => x.classList.toggle('on', x === b && legendOn));
+      paths.classed('dim', f => legendOn && contOf(f) !== legendOn);
+    };
+    legend.appendChild(b);
+  });
+
+  /* ---------- 格式化工具 ---------- */
+  const nf = new Intl.NumberFormat('zh-TW');
+  function fmtPop(n) {
+    if (n == null) return '—';
+    const short = n >= 1e8 ? (n / 1e8).toFixed(2).replace(/\.?0+$/, '') + ' 億'
+                : n >= 1e4 ? (n / 1e4).toFixed(1).replace(/\.0$/, '') + ' 萬' : String(n);
+    return `${short.replace(/^\d+/, m => nf.format(+m))}人`;
+  }
+  const fmtArea = a => a == null ? '—' : `${nf.format(Math.round(a))} 平方公里`;
+  function fmtLL(ll) {
+    if (!ll) return '—';
+    const [la, lo] = ll;
+    return `${la >= 0 ? '北緯' : '南緯'} ${Math.abs(la).toFixed(2)}°，${lo >= 0 ? '東經' : '西經'} ${Math.abs(lo).toFixed(2)}°`;
+  }
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const flagUrl = (d, w = 160) => `https://flagcdn.com/w${w}/${d.a2.toLowerCase()}.png`;
+
+  /* ---------- 首府中文名（Wikidata，背景載入） ---------- */
+  const capZh = {};
+  (async function loadCapitals() {
+    const caps = [...new Set(Object.values(D).flatMap(d => d.cap))];
+    for (let i = 0; i < caps.length; i += 40) {
+      const batch = caps.slice(i, i + 40);
+      const url = 'https://www.wikidata.org/w/api.php?action=wbgetentities&sites=enwiki&format=json&origin=*'
+        + '&props=labels|sitelinks&sitefilter=enwiki&languages=zh-tw|zh-hant|zh&languagefallback=1'
+        + '&titles=' + encodeURIComponent(batch.join('|'));
+      try {
+        const j = await (await fetch(url)).json();
+        Object.values(j.entities || {}).forEach(e => {
+          const t = e.sitelinks && e.sitelinks.enwiki && e.sitelinks.enwiki.title;
+          const lab = e.labels && (e.labels['zh-tw'] || e.labels['zh-hant'] || e.labels['zh'] || Object.values(e.labels)[0]);
+          if (t && lab) capZh[t] = lab.value;
+        });
+      } catch {}
+    }
+    if (selectedId && popup.style.display === 'block') refreshPopupCapital();
+  })();
+  const capText = d => d.cap.length ? d.cap.map(c => capZh[c] && capZh[c] !== c ? `${capZh[c]}（${c}）` : c).join('、') : '—';
+
+  /* ---------- 基本資訊對話框 ---------- */
+  function showPopup(f, x, y) {
+    selectedId = f.id;
+    paths.classed('selected', p => p.id === f.id);
+    const d = D[f.id];
+    const cont = contOf(f);
+    if (d) {
+      popup.innerHTML = `
+        <button class="x" aria-label="關閉">×</button>
+        <div class="head">
+          <img src="${flagUrl(d)}" alt="">
+          <div><h2>${esc(zhName(f))}</h2><div class="en">${esc(d.n)}</div></div>
+        </div>
+        <dl class="kv">
+          <dt>洲別</dt><dd>${cont}</dd>
+          <dt>首都</dt><dd id="pCap">${esc(capText(d))}</dd>
+          <dt>面積</dt><dd>${fmtArea(d.area)}</dd>
+          <dt>人口</dt><dd>${fmtPop(d.pop)}</dd>
+          <dt>經緯度</dt><dd>${fmtLL(d.ll)}</dd>
+        </dl>
+        <button class="go">查看詳細資訊 →</button>
+        <p class="tiny">也可以再點一次該國家進入詳細頁</p>`;
+      popup.querySelector('.go').onclick = () => openDetail(f);
+    } else {
+      popup.innerHTML = `
+        <button class="x" aria-label="關閉">×</button>
+        <div class="head"><div><h2>${esc(zhName(f))}</h2><div class="en">${esc(f.properties.name)}</div></div></div>
+        <p class="tiny" style="text-align:left">此地區缺少詳細統計資料。</p>`;
+    }
+    popup.querySelector('.x').onclick = closePopup;
+    popup.style.display = 'block';
+    const pw = 300, ph = popup.offsetHeight;
+    popup.style.left = Math.max(8, Math.min(window.innerWidth - pw - 8, x + 16)) + 'px';
+    popup.style.top = Math.max(64, Math.min(window.innerHeight - ph - 8, y - 20)) + 'px';
+  }
+  function refreshPopupCapital() {
+    const el = document.getElementById('pCap'); if (!el || !D[selectedId]) return;
+    el.textContent = capText(D[selectedId]);
+  }
+  function closePopup() {
+    popup.style.display = 'none';
+    selectedId = null;
+    paths.classed('selected', false);
+  }
+
+  /* ---------- 詳細頁 ---------- */
+  const detail = document.getElementById('detail');
+  let detailId = null, token = 0;
+
+  const TITLE_FIX = { 'Georgia': 'Georgia (country)', 'Ireland': 'Republic of Ireland', 'DR Congo': 'Democratic Republic of the Congo',
+    'Congo': 'Republic of the Congo', 'Jersey': 'Jersey', 'Guinea': 'Guinea', 'Niger': 'Niger', 'Macau': 'Macau',
+    'Palestine': 'State of Palestine', 'Timor-Leste': 'East Timor', 'Ivory Coast': 'Ivory Coast', 'Cape Verde': 'Cape Verde' };
+  const THE = ['United States', 'United Kingdom', 'Netherlands', 'Philippines', 'Bahamas', 'Gambia', 'Maldives',
+    'Czechia', 'United Arab Emirates', 'Central African Republic', 'DR Congo', 'Comoros', 'Marshall Islands', 'Seychelles',
+    'Cayman Islands', 'Solomon Islands', 'Faroe Islands', 'Cook Islands', 'Turks and Caicos Islands', 'Isle of Man'];
+  const ZH_WIKI = { 'Taiwan': '臺灣' };
+
+  function brief(t) {
+    const out = [];
+    for (const para of t.trim().split('\n').filter(Boolean)) { out.push(para); if (out.join('').length > 320) break; }
+    return out.join('\n');
+  }
+  async function wikiJSON(url) { const r = await fetch(url); return r.json(); }
+
+  async function fetchIntro(f) {
+    const d = D[f.id];
+    const zh = ZH_WIKI[d.n] || zhName(f);
+    try {
+      const j = await wikiJSON('https://zh.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&redirects=1&variant=zh-tw&format=json&origin=*&titles=' + encodeURIComponent(zh));
+      const p = Object.values(j.query.pages)[0];
+      if (p && p.extract) return { text: brief(p.extract), url: 'https://zh.wikipedia.org/wiki/' + encodeURIComponent(p.title), lang: '中文維基百科' };
+    } catch {}
+    try {
+      const j = await wikiJSON('https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&redirects=1&format=json&origin=*&titles=' + encodeURIComponent(TITLE_FIX[d.n] || d.n));
+      const p = Object.values(j.query.pages)[0];
+      if (p && p.extract) return { text: brief(p.extract), url: 'https://en.wikipedia.org/wiki/' + encodeURIComponent(p.title), lang: 'English Wikipedia' };
+    } catch {}
+    return null;
+  }
+
+  const BAD = /flag|map|coat[_ ]of|arms|seal|emblem|logo|locator|location|portrait|signature|symbol|icon|diagram|chart|graph|banknote|coin|stamp|currency|svg|president|minister|king|queen|prince|election|protest|war|battle|soldier|army|population|census|gdp|party|stadium|airport|metro|train|bus/i;
+
+  function parseImages(j) {
+    const pages = j.query && j.query.pages ? Object.values(j.query.pages) : [];
+    return pages.filter(p => p.imageinfo && p.imageinfo[0])
+      .sort((a, b) => (a.index || 0) - (b.index || 0))
+      .map(p => ({ title: p.title, ...p.imageinfo[0] }));
+  }
+  async function imagesOf(title) {
+    const url = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&generator=images&gimlimit=80&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=720&titles=${encodeURIComponent(title)}`;
+    try { return parseImages(await wikiJSON(url)); } catch { return []; }
+  }
+  async function searchImages(term) {
+    const url = `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=30&gsrsearch=${encodeURIComponent(term)}&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=720`;
+    try { return parseImages(await wikiJSON(url)); } catch { return []; }
+  }
+  function goodPhoto(p) {
+    return p.mime === 'image/jpeg' && p.width >= 900 && p.height >= 500 && p.thumburl && !BAD.test(p.title);
+  }
+  async function fetchPhotos(f) {
+    const d = D[f.id];
+    const name = d.n;
+    const art = TITLE_FIX[name] || name;
+    const tour = 'Tourism in ' + (THE.includes(name) ? 'the ' : '') + (name === 'DR Congo' ? 'the Democratic Republic of the Congo' : name === 'Czechia' ? 'the Czech Republic' : name);
+    const lists = await Promise.all([
+      imagesOf(tour),
+      imagesOf('List of World Heritage Sites in ' + (THE.includes(name) ? 'the ' : '') + name),
+      imagesOf(art),
+    ]);
+    let all = lists.flat().filter(goodPhoto);
+    if (all.length < 6) all = all.concat((await searchImages(`${name} landmark landscape`)).filter(goodPhoto));
+    const seen = new Set();
+    return all.filter(p => !seen.has(p.title) && seen.add(p.title)).slice(0, 18);
+  }
+  const captionOf = t => t.replace(/^File:/, '').replace(/\.[a-z]+$/i, '').replace(/_/g, ' ').replace(/\s+/g, ' ').slice(0, 90);
+
+  function openDetail(f) {
+    const d = D[f.id]; if (!d) return;
+    const my = ++token;
+    detailId = f.id;
+    closePopup();
+    const cont = contOf(f), c = CONT[cont];
+    const dens = d.pop && d.area ? nf.format(Math.round(d.pop / d.area)) + ' 人/平方公里' : '—';
+    detail.innerHTML = `
+      <div class="d-top">
+        <button class="back">← 返回地圖</button>
+        <img src="${flagUrl(d, 80)}" alt="">
+        <div>
+          <h2>${esc(zhName(f))}<span class="tag" style="background:${d3.hsl(c.hue, Math.max(c.s, .3), .42).formatHex()}">${cont}</span></h2>
+          <div class="en">${esc(d.o)}${d.o !== d.n ? ' · ' + esc(d.n) : ''}</div>
+        </div>
+      </div>
+      <div class="d-body">
+        <div class="d-grid">
+          <div class="panel">
+            <svg id="miniMap" viewBox="0 0 300 190"></svg>
+            <dl class="kv">
+              <dt>首都</dt><dd id="dCap">${esc(capText(d))}</dd>
+              <dt>區域</dt><dd>${esc(d.sub || d.reg)}</dd>
+              <dt>經緯度</dt><dd>${fmtLL(d.ll)}</dd>
+              <dt>語言</dt><dd>${d.lang.length ? esc(d.lang.join('、')) : '—'}</dd>
+              <dt>貨幣</dt><dd>${d.cur.length ? esc(d.cur.join('、')) : '—'}</dd>
+              <dt>網域</dt><dd>${d.tld.length ? esc(d.tld.join(' ')) : '—'}</dd>
+              <dt>聯合國</dt><dd>${d.un ? '會員國' : '非會員國'}</dd>
+              <dt>ISO 代碼</dt><dd>${d.a2} / ${d.a3}</dd>
+            </dl>
+          </div>
+          <div>
+            <div class="stats">
+              <div class="stat"><span>人口</span><b>${fmtPop(d.pop)}</b></div>
+              <div class="stat"><span>面積</span><b>${d.area ? nf.format(Math.round(d.area)) : '—'}</b><span>平方公里</span></div>
+              <div class="stat"><span>人口密度</span><b>${dens.split(' ')[0]}</b><span>人/平方公里</span></div>
+              <div class="stat"><span>鄰國數</span><b>${d.b.length}</b></div>
+            </div>
+            <div class="panel">
+              <h3>國家簡介</h3>
+              <div class="intro loading" id="intro">載入中…</div>
+              <div class="src" id="introSrc"></div>
+              ${d.b.length ? `<h3 style="margin-top:18px">鄰國（點擊前往）</h3><div class="chips" id="nbrs"></div>` : ''}
+            </div>
+          </div>
+        </div>
+        <h2 class="gallery-h">📸 地標與知名風景</h2>
+        <div class="gallery" id="gallery">${'<div class="skeleton"></div>'.repeat(6)}</div>
+        <p class="src">照片來自維基百科 / 維基共享資源，點擊可放大並查看原始頁面與授權資訊。</p>
+      </div>`;
+    detail.style.display = 'block';
+    detail.scrollTop = 0;
+    detail.querySelector('.back').onclick = closeDetail;
+
+    // 迷你地圖
+    const mini = d3.select('#miniMap');
+    let focus = f;
+    if (f.geometry.type === 'MultiPolygon') {
+      const best = f.geometry.coordinates.map(c => ({ type: 'Polygon', coordinates: c })).sort((p, q) => d3.geoArea(q) - d3.geoArea(p))[0];
+      focus = best;
+    }
+    const mp = d3.geoNaturalEarth1().fitExtent([[10, 10], [290, 180]], focus);
+    mini.append('path').datum(f).attr('d', d3.geoPath(mp)).attr('fill', fillOf(f)).attr('stroke', '#1f2933').attr('stroke-width', 1);
+
+    // 鄰國
+    const nb = document.getElementById('nbrs');
+    if (nb) d.b.forEach(a3 => {
+      const nfeat = byA3[a3]; if (!nfeat) return;
+      const b = document.createElement('button');
+      b.textContent = zhName(nfeat);
+      b.onclick = () => openDetail(nfeat);
+      nb.appendChild(b);
+    });
+    // 中文首都名稱可能稍後才載入
+    setTimeout(() => { const el = document.getElementById('dCap'); if (el && detailId === f.id) el.textContent = capText(d); }, 2500);
+
+    fetchIntro(f).then(r => {
+      if (my !== token) return;
+      const el = document.getElementById('intro'); el.classList.remove('loading');
+      if (r) { el.textContent = r.text; document.getElementById('introSrc').innerHTML = `資料來源：<a href="${r.url}" target="_blank" rel="noopener">${r.lang}</a>`; }
+      else el.textContent = '目前無法取得簡介（請檢查網路連線）。';
+    });
+    fetchPhotos(f).then(list => {
+      if (my !== token) return;
+      const gal = document.getElementById('gallery');
+      if (!list.length) { gal.outerHTML = '<div class="empty" id="gallery">找不到適合的照片，或網路無法連線到維基百科。</div>'; return; }
+      gal.innerHTML = '';
+      list.forEach(p => {
+        const fig = document.createElement('figure');
+        fig.className = 'shot';
+        const img = new Image();
+        img.loading = 'lazy'; img.alt = captionOf(p.title); img.src = p.thumburl;
+        img.onerror = () => fig.remove();
+        const cap = document.createElement('figcaption');
+        cap.textContent = captionOf(p.title);
+        fig.append(img, cap);
+        fig.onclick = () => openLightbox(p);
+        gal.appendChild(fig);
+      });
+    });
+  }
+  function closeDetail() { detail.style.display = 'none'; detailId = null; token++; }
+
+  /* ---------- 燈箱 ---------- */
+  const lb = document.getElementById('lightbox');
+  function openLightbox(p) {
+    lb.innerHTML = `<img src="${p.thumburl}" alt=""><p>${esc(captionOf(p.title))} · <a href="${p.descriptionurl}" target="_blank" rel="noopener">原始頁面與授權</a></p>`;
+    lb.style.display = 'flex';
+  }
+  lb.onclick = e => { if (e.target.tagName !== 'A') lb.style.display = 'none'; };
+
+  /* ---------- 搜尋 ---------- */
+  const q = document.getElementById('q'), sug = document.getElementById('suggest');
+  const searchable = features.filter(f => D[f.id]).map(f => ({ f, zh: zhName(f), en: D[f.id].n, a2: D[f.id].a2 }));
+  function focusCountry(f) {
+    const [[x0, y0], [x1, y1]] = path.bounds(f);
+    const k = Math.min(8, 0.6 / Math.max((x1 - x0) / W, (y1 - y0) / H));
+    const tx = W / 2 - k * (x0 + x1) / 2, ty = H / 2 - k * (y0 + y1) / 2;
+    svg.transition().duration(700).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(k))
+      .on('end', () => {
+        const m = svg.node().getScreenCTM();
+        const px = m.a * W / 2 + m.e, py = m.d * H / 2 + m.f;
+        showPopup(f, px + 20, py);
+      });
+  }
+  function renderSuggest() {
+    const t = q.value.trim().toLowerCase();
+    if (!t) { sug.style.display = 'none'; return; }
+    const hits = searchable.filter(s => s.zh.includes(t) || s.en.toLowerCase().includes(t) || s.a2.toLowerCase() === t).slice(0, 8);
+    sug.innerHTML = '';
+    hits.forEach(s => {
+      const b = document.createElement('button');
+      b.innerHTML = `<img src="${flagUrl(D[s.f.id], 40)}" alt=""><span>${esc(s.zh)}</span><small>${esc(s.en)}</small>`;
+      b.onclick = () => { q.value = ''; sug.style.display = 'none'; focusCountry(s.f); };
+      sug.appendChild(b);
+    });
+    sug.style.display = hits.length ? 'block' : 'none';
+  }
+  q.addEventListener('input', renderSuggest);
+  q.addEventListener('keydown', e => { if (e.key === 'Enter') { const b = sug.querySelector('button'); if (b) b.click(); } });
+  document.addEventListener('click', e => { if (!e.target.closest('.search')) sug.style.display = 'none'; });
+
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (lb.style.display === 'flex') lb.style.display = 'none';
+    else if (detail.style.display === 'block') closeDetail();
+    else closePopup();
+  });
+})();
+</script>
+</body>
+</html>
