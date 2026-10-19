@@ -1,0 +1,11 @@
+{
+  "name": "血壓記錄 (米白陶土橘)",
+  "dataColors": ["#C0623F", "#4F6D7A", "#D9A441", "#7A8B69", "#8C5A4A", "#A8A29A", "#2B2622", "#E3B7A0"],
+  "background": "#F5F0E8",
+  "foreground": "#2B2622",
+  "tableAccent": "#C0623F",
+  "textClasses": {
+    "title": { "fontFace": "Noto Serif TC", "fontSize": 14, "color": "#2B2622" },
+    "label": { "fontFace": "Noto Sans TC", "fontSize": 10, "color": "#6B625B" }
+  }
+}
