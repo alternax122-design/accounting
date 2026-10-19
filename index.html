@@ -2,8 +2,18 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>記帳系統</title>
+<!-- 手機：加到主畫面後像 App 一樣全螢幕開啟 -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="記帳">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#FAF9F5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
   import { getFirestore, collection, addDoc, getDocs, deleteDoc, updateDoc, doc, query, orderBy, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
@@ -461,7 +471,8 @@
     .summary.no-ops .sum-item + .sum-item:not(.balance) { border-left: none; }
   }
   @media (max-width: 600px) {
-    .wrap { padding: 24px 16px 64px; }
+    .wrap { padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(64px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+    .field input, .field select, .month-nav input[type=month] { font-size: 16px; }
     .fields { grid-template-columns: minmax(0, 1fr); }
     .btn-row { flex-direction: column; }
     .list-card, .form-card { padding: 18px; }
